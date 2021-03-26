@@ -1,0 +1,16 @@
+[Unit]
+Description=Analyze nagios hoststate
+After=nagios.service
+PartOf=nagios.service
+
+[Service]
+Type=forking
+User=nagios
+Group=nagios
+ExecStart=/usr/local/scripts/hoststate-monitor.pl --start
+ExecStop=/usr/local/scripts/hoststate-monitor.pl --stop
+Restart=always
+PIDFile=/var/run/nagios/hoststate-monitor.pid
+
+[Install]
+WantedBy=multi-user.target

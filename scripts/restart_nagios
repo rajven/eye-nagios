@@ -1,0 +1,10 @@
+#!/bin/bash
+
+/usr/local/scripts/gen_nagios_config.pl
+[ $? -ne 0 ] && exit
+
+/usr/local/scripts/sync_mikrotik_poe_monitor.pl
+
+/sbin/service nagios restart >/dev/null 2>&1
+
+exit
