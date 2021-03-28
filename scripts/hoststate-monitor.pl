@@ -94,8 +94,6 @@ chomp($logline);
 my ($date,$hoststate,$hoststatetype,$hostname,$hostip,$hostid,$hosttype,$svc_control)= split (/\|/, $logline);
 next if (!$hostid);
 
-db_log_debug($hdb,"Get: DATE $date HOSTSTATE $hoststate HOSTSTATETYPE $hoststatetype HOSTNAME $hostname IP $hostip ID $hostid HOSTTYPE $hosttype SERVICE CONTROL $svc_control");
-
 if (time()-$last_refresh_config>=60) { init_option($hdb); }
 
 if (!$svc_control) { $svc_control=0; }
@@ -106,7 +104,7 @@ my $old_state = 'HARDDOWN';
 
 my $device;
 if ($hosttype=~/device/i) {
-    $device = get_record_sql($hdb,'SELECT nagios_status FROM devices WHERE id='.$hostid); 
+    $device = get_record_sql($hdb,'SELECT nagios_status FROM devices WHERE id='.$hostid);
     } else {
     $device = get_record_sql($hdb,'SELECT nagios_status,nagios_handler FROM User_auth WHERE id='.$hostid);
     }
@@ -124,27 +122,27 @@ if ($hoststate ne $old_state) {
     db_log_verbose($hdb,"Host changed! $hostname [$hostip] => $hoststate, old: $old_state");
     my $ip_aton=StrToIp($hostip);
     if ($hosttype=~/device/i) {
-	    do_sql($hdb,'UPDATE devices SET nagios_status="'.$hoststate.'" WHERE id='.$hostid);
-	    do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE deleted=0 AND ip_int='.$ip_aton);
-	    } else {
-	    do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE id='.$hostid);
-	    }
+            do_sql($hdb,'UPDATE devices SET nagios_status="'.$hoststate.'" WHERE id='.$hostid);
+            do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE deleted=0 AND ip_int='.$ip_aton);
+            } else {
+            do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE id='.$hostid);
+            }
     if ($hoststate=~/UP/i) { nagios_host_svc_enable($hostname,1); }
     if ($hoststate=~/SOFTDOWN/i) { if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); } }
     if ($hoststate=~/HARDDOWN/i) {
-	if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
-	if ($device->{nagios_handler}) {
-	    db_log_info($hdb,"Event handler $device->{nagios_handler} for $hostname [$hostip] => $hoststate found!");
-	    if ($device->{nagios_handler}=~/restart-port/i) {
-		    my $run_cmd = "/usr/local/scripts/restart_port_snmp.pl $hostip & ";
-    		    db_log_info($hdb,"Nagios eventhandler restart-port started for ip: $hostip");
-		    db_log_info($hdb,"Run handler: $run_cmd");
-		    system($run_cmd);
-		    }
-	    } else {
-	    db_log_debug($hdb,"Event handler for $hostname [$hostip] => $hoststate not found.");
-	    }
-	}
+        if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
+        if ($device->{nagios_handler}) {
+            db_log_info($hdb,"Event handler $device->{nagios_handler} for $hostname [$hostip] => $hoststate found!");
+            if ($device->{nagios_handler}=~/restart-port/i) {
+                    my $run_cmd = "/usr/local/scripts/restart_port_snmp.pl $hostip & ";
+                    db_log_info($hdb,"Nagios eventhandler restart-port started for ip: $hostip");
+                    db_log_info($hdb,"Run handler: $run_cmd");
+                    system($run_cmd);
+                    }
+            } else {
+            db_log_debug($hdb,"Event handler for $hostname [$hostip] => $hoststate not found.");
+            }
+        }
     }
 }
 close(hoststate);

@@ -105,7 +105,7 @@ if ($poe_oid) {
     }
 
 if ($admin_oid) {
-    $ret=snmp_set_int($ip,$admin_oid,$poe_disabled_value,$community,161,$snmp_version); 
+    $ret=snmp_set_int($ip,$admin_oid,$poe_disabled_value,$community,161,$snmp_version);
     db_log_info($dbh,"Try shutdown port $port.");
     db_log_debug($dbh,"Send to oid: $admin_oid value: $poe_disabled_value");
     }
@@ -119,7 +119,7 @@ if ($admin_oid) {
     }
 
 if ($poe_oid) {
-    $ret=snmp_set_int($ip,$poe_oid,$poe_enabled_value,$community,161,$snmp_version); 
+    $ret=snmp_set_int($ip,$poe_oid,$poe_enabled_value,$community,161,$snmp_version);
     db_log_info($dbh,"Up port $port.");
     db_log_debug($dbh,"Send to oid: $poe_oid value: $poe_enabled_value");
     }

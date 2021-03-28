@@ -12,7 +12,7 @@ use base 'Exporter';
 use vars qw(@EXPORT @ISA);
 use Rstat::config;
 use Rstat::main;
-use Rstat::mfi;
+use Rstat::mysql;
 use Time::Local;
 use Data::Dumper;
 
@@ -23,6 +23,8 @@ nagios_send_command
 nagios_host_svc_disable
 nagios_host_svc_enable
 print_nagios_cfg
+%ou
+@cfg_dirs
 );
 
 BEGIN
@@ -105,7 +107,7 @@ my $template = 'generic-host';
 
 my $default_service="local-service";
 
-if ($device->{ou_id} ~~ [4,5,6,8,9,12]) {
+if (exists $ou{$device->{ou_id}}) {
     #12 - WiFi AP
     if ($device->{ou_id} eq 12 ) { $group = 'ap'; $template='ap'; }
     #4 - VOIP
@@ -118,9 +120,9 @@ if ($device->{ou_id} ~~ [4,5,6,8,9,12]) {
     if ($device->{ou_id} eq 8 ) { $group = 'ups'; $template='ups'; }
     #9 - Охрана
     if ($device->{ou_id} eq 9 ) { $group = 'security'; $template='security'; }
-    }
+    } else { return; }
 
-my $cfg_file = "/etc/nagios/".$group."/".$device->{name}.".cfg";
+my $cfg_file = $ou{$device->{ou_id}}."/".$device->{name}.".cfg";
 open(FH, "> $cfg_file");
 print(FH "define host{\n");
 print(FH "       use                     $template\n");
@@ -135,7 +137,7 @@ if ($device->{device_model}) {
 if ($device->{parent_name}) {
         print(FH "       parents                    $device->{parent_name}\n");
         }
-print(FH "       notes_url       http://stat.lan.local/admin/users/editauth.php?id=$device->{auth_id}\n");
+print(FH "       notes_url       ".$config{stat_url}."/admin/users/editauth.php?id=".$device->{auth_id}."\n");
 print(FH "       }\n\n");
 
 if ($ping_enable) {
@@ -183,9 +185,9 @@ my $default_service="local-service";
 
 #switch | router
 if ($device->{type} ~~ [1,2]) {
-    my $cfg_file = "/etc/nagios/switches/".$device->{name}.".cfg";
+    my $cfg_file = $ou{'7'}."/".$device->{name}.".cfg";
     my $device_template = 'switches';
-    if ($device->{type} eq 1) {  $cfg_file = "/etc/nagios/routers/".$device->{name}.".cfg"; $device_template='routers'; }
+    if ($device->{type} eq 1) {  $cfg_file = $ou{'10'}."/".$device->{name}.".cfg"; $device_template='routers'; }
     open(FH, "> $cfg_file");
     print(FH "define  host {\n");
     print(FH "       use                     $device_template\n");
@@ -200,7 +202,7 @@ if ($device->{type} ~~ [1,2]) {
     if ($device->{parent_name}) {
         print(FH "       parents                    $device->{parent_name}\n");
         }
-    print(FH "       notes_url       http://stat.lan.local/admin/devices/editswitches.php?id=$device->{device_id}\n");
+    print(FH "       notes_url       ".$config{stat_url}."/admin/devices/editswitches.php?id=$device->{device_id}\n");
     print(FH "       }\n\n");
     #ping
     print(FH "define service{\n");
@@ -263,7 +265,7 @@ if ($device->{type} ~~ [1,2]) {
 #auth record
 if ($device->{type} eq 3) {
     my $add_ping = 1;
-    if ($device->{ou_id} ~~ [5,22,23,24]) { $add_ping = 0; }
+    if ($device->{ou_id} ~~ [5,23,24]) { $add_ping = 0; }
     my $cfg_file = print_single_host($device,$add_ping);
     open(FH, ">> $cfg_file");
     #IPCAM
@@ -320,6 +322,18 @@ if ($custom_cfg->{template}) {
     }
 close(FH);
 }
+
+my @OU_list = get_records_sql($dbh,"SELECT * FROM OU WHERE nagios_dir IS NOT NULL");
+
+our %ou;
+our @cfg_dirs = ();
+
+foreach my $row (@OU_list) {
+next if (!$row->{nagios_dir});
+$ou{$row->{id}}=$row->{nagios_dir};
+push(@cfg_dirs,$row->{nagios_dir});
+}
+
 
 #---------------------------------------------------------------------------------
 

@@ -19,18 +19,6 @@ use Rstat::main;
 use Rstat::nagios;
 use Rstat::mysql;
 
-my @cfg_dirs = (
-'/etc/nagios/switches',
-'/etc/nagios/routers',
-'/etc/nagios/ap',
-'/etc/nagios/voip',
-'/etc/nagios/videocam',
-'/etc/nagios/printers',
-'/etc/nagios/ups',
-'/etc/nagios/security',
-'/etc/nagios/any'
-);
-
 my %devices;
 my %auths;
 
