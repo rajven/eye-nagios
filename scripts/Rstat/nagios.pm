@@ -202,7 +202,7 @@ if ($device->{type} ~~ [1,2]) {
     if ($device->{parent_name}) {
         print(FH "       parents                    $device->{parent_name}\n");
         }
-    print(FH "       notes_url       ".$config{stat_url}."/admin/devices/editswitches.php?id=$device->{device_id}\n");
+    print(FH "       notes_url       ".$config{stat_url}."/admin/devices/editdevice.php?id=$device->{device_id}\n");
     print(FH "       }\n\n");
     #ping
     print(FH "define service{\n");
