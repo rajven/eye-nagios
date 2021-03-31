@@ -23,7 +23,6 @@ nagios_send_command
 nagios_host_svc_disable
 nagios_host_svc_enable
 print_nagios_cfg
-%ou
 @cfg_dirs
 );
 
@@ -85,13 +84,18 @@ my $device = shift;
 my $template_file = shift;
 my $result;
 my @custom_cfg=();
-if (-e $template_file) { @custom_cfg = read_file($template_file);  }
+if (-e $template_file) { @custom_cfg = read_file($template_file); } else { return; }
 if (@custom_cfg and scalar(@custom_cfg)) {
     foreach my $row (@custom_cfg) {
 	next if (!$row);
         $row=~s/\%HOSTNAME\%/$device->{name}/;
         $row=~s/\%HOST\%/$device->{name}/;
 	$row=~s/\%HOSTIP\%/$device->{ip}/;
+	$row=~s/\%HOST_IP\%/$device->{ip}/;
+	$row=~s/\%COMMUNITY\%/$device->{community}/ if ($device->{community});
+	$row=~s/\%RW_COMMUNITY\%/$device->{rw_community}/ if ($device->{rw_community});
+	$row=~s/\%SNMP_VERSION\%/$device->{snmp_version}/ if ($device->{snmp_version});
+	$row=~s/\%MODEL\%/$device->{device_model}->{model_name}/ if ($device->{device_model}->{model_name});
         push(@{$result->{template}},$row);
 	if ($row=~/\s+service_description\s+(.*)$/i) { $result->{services}->{$1}=1; }
 	}
@@ -102,27 +106,16 @@ return $result;
 sub print_single_host {
 my $device = shift;
 my $ping_enable = shift || 0;
-my $group = 'any';
 my $template = 'generic-host';
-
 my $default_service="local-service";
 
-if (exists $ou{$device->{ou_id}}) {
-    #12 - WiFi AP
-    if ($device->{ou_id} eq 12 ) { $group = 'ap'; $template='ap'; }
-    #4 - VOIP
-    if ($device->{ou_id} eq 4 ) { $group = 'voip'; $template='voip'; }
-    #5 - IPCAM
-    if ($device->{ou_id} eq 5 ) { $group = 'videocam'; $template='ip-cam'; }
-    #6 - Printers
-    if ($device->{ou_id} eq 6 ) { $group = 'printers'; $template='printers'; $default_service='printer-service'; }
-    #8 - UPS
-    if ($device->{ou_id} eq 8 ) { $group = 'ups'; $template='ups'; }
-    #9 - Охрана
-    if ($device->{ou_id} eq 9 ) { $group = 'security'; $template='security'; }
-    } else { return; }
+if ($device->{ou_id}>0) {
+    $ping_enable = $device->{ou}->{nagios_ping};
+    if ($device->{ou}->{nagios_host_use}) { $template=$device->{ou}->{nagios_host_use}; }
+    if ($device->{ou}->{nagios_default_service}) { $default_service=$device->{ou}->{nagios_default_service}; }
+    }
 
-my $cfg_file = $ou{$device->{ou_id}}."/".$device->{name}.".cfg";
+my $cfg_file = $device->{ou}->{nagios_dir}."/".$device->{name}.".cfg";
 open(FH, "> $cfg_file");
 print(FH "define host{\n");
 print(FH "       use                     $template\n");
@@ -130,14 +123,14 @@ print(FH "       host_name               $device->{name}\n");
 print(FH "       alias                   $device->{name}\n");
 print(FH "       address                 $device->{ip}\n");
 print(FH "       _ID			 $device->{auth_id}\n"); 
-print(FH "       _TYPE			 user\n"); 
+print(FH "       _TYPE			 user\n");
 if ($device->{device_model}) {
-	print(FH "       notes		$device->{device_model}\n"); 
+	print(FH "       notes		$device->{device_model}->{model_name}\n"); 
 	}
 if ($device->{parent_name}) {
         print(FH "       parents                    $device->{parent_name}\n");
         }
-print(FH "       notes_url       ".$config{stat_url}."/admin/users/editauth.php?id=".$device->{auth_id}."\n");
+print(FH "       notes_url       ".$config_ref{stat_url}."/admin/users/editauth.php?id=".$device->{auth_id}."\n");
 print(FH "       }\n\n");
 
 if ($ping_enable) {
@@ -157,7 +150,7 @@ if ($device->{parent_name} and $device->{link_check} and $device->{parent_snmp_v
         print(FH "       check_command              check_ifoperstatus!$device->{parent_port_snmp_index}!$device->{parent_community}\n");
         print(FH "       }\n");
         print(FH "\n");
-        #src
+        #crc
         print(FH "define service{\n");
         print(FH "       use                        service-snmp-crc\n");
         print(FH "       host_name                  $device->{parent_name}\n");
@@ -180,15 +173,30 @@ my $device_custom_cfg = "/etc/nagios/custom-cfg/".$device->{name}.".cfg";
 if (-e $device_custom_cfg) { $custom_cfg = read_host_template($device,$device_custom_cfg); }
 $device_custom_cfg = "/etc/nagios/custom-cfg/".$device_id.".cfg";
 if (-e $device_custom_cfg) { $custom_cfg = read_host_template($device,$device_custom_cfg); }
-
 my $default_service="local-service";
+
+if (!$device->{ou}->{nagios_dir}) { print Dumper($device); }
+
+my $cfg_file = $device->{ou}->{nagios_dir}."/".$device->{name}.".cfg";
+
+if ($custom_cfg->{template}) {
+    open(FH, "> $cfg_file");
+    my @custom_cfg = @{$custom_cfg->{template}};
+    if (@custom_cfg and scalar(@custom_cfg)) {
+	foreach my $row (@custom_cfg) {
+	    next if (!$row);
+            print(FH $row."\n");
+	    }
+	}
+    close(FH);
+    return;
+    }
 
 #switch | router
 if ($device->{type} ~~ [1,2]) {
-    my $cfg_file = $ou{'7'}."/".$device->{name}.".cfg";
-    my $device_template = 'switches';
-    if ($device->{type} eq 1) {  $cfg_file = $ou{'10'}."/".$device->{name}.".cfg"; $device_template='routers'; }
     open(FH, "> $cfg_file");
+    my $device_template = 'switches';
+    if ($device->{type} eq 2) {  $device_template='routers'; }
     print(FH "define  host {\n");
     print(FH "       use                     $device_template\n");
     print(FH "       host_name               $device->{name}\n");
@@ -197,12 +205,12 @@ if ($device->{type} ~~ [1,2]) {
     print(FH "       _ID                 $device->{device_id}\n");
     print(FH "       _TYPE                 device\n");
     if ($device->{device_model}) {
-	print(FH "       notes		$device->{device_model}\n"); 
+	print(FH "       notes		$device->{device_model}->{model_name}\n");
 	}
     if ($device->{parent_name}) {
         print(FH "       parents                    $device->{parent_name}\n");
         }
-    print(FH "       notes_url       ".$config{stat_url}."/admin/devices/editdevice.php?id=$device->{device_id}\n");
+    print(FH "       notes_url       ".$config_ref{stat_url}."/admin/devices/editdevice.php?id=$device->{device_id}\n");
     print(FH "       }\n\n");
     #ping
     print(FH "define service{\n");
@@ -261,79 +269,27 @@ if ($device->{type} ~~ [1,2]) {
             print(FH "       }\n\n");
 	    }
 	}
+    close FH;
     }
+
 #auth record
 if ($device->{type} eq 3) {
-    my $add_ping = 1;
-    if ($device->{ou_id} ~~ [5,23,24]) { $add_ping = 0; }
-    my $cfg_file = print_single_host($device,$add_ping);
+    my $cfg_file = print_single_host($device);
     open(FH, ">> $cfg_file");
-    #IPCAM
-    if ($device->{ou_id} eq 5) {
-        print(FH "define service {\n");
-	print(FH "       use                     $default_service\n");
-        print(FH "       host_name               $device->{name}\n");
-	print(FH "       service_description     Snmp Model\n");
-        print(FH "       contact_groups          admins\n");
-	print(FH "       check_command           check_snmp_hikvision\n");
-        print(FH "       }\n");
-	print(FH "\n");
-	}
-    #Printers
-    if ($device->{ou_id} eq 6) {
-	my $printer_cfg;
-	if ($device->{device_model}=~/^OKI\s+/i) { $printer_cfg = read_host_template($device,'/etc/nagios/gen_template/oki.cfg'); }
-	if ($device->{device_model}=~/^HP\s+/i) { $printer_cfg = read_host_template($device,'/etc/nagios/gen_template/hp.cfg'); }
-	if ($device->{device_model}=~/^Panasonic\s+/i) { $printer_cfg = read_host_template($device,'/etc/nagios/gen_template/panasonic.cfg'); }
-	if ($device->{device_model}=~/^Epson\s+/i) { $printer_cfg = read_host_template($device,'/etc/nagios/gen_template/epson.cfg'); }
-	if ($printer_cfg->{template}) {
-	    my @printer_cfg = @{$printer_cfg->{template}};
-	    if (@printer_cfg and scalar(@printer_cfg)) {
-		foreach my $row (@printer_cfg) {
+    my $dev_cfg;
+    if ($device->{device_model} and $device->{device_model}->{nagios_template}) { $dev_cfg = read_host_template($device,'/etc/nagios/gen_template/'.$device->{device_model}->{nagios_template}); }
+    if ($dev_cfg and $dev_cfg->{template}) {
+	    my @dev_cfg = @{$dev_cfg->{template}};
+	    if (@dev_cfg and scalar(@dev_cfg)) {
+		foreach my $row (@dev_cfg) {
 		    next if (!$row);
     		    print(FH $row."\n");
 		    }
 		}
-	    }
-	}
-    # UPS
-    if ($device->{ou_id} eq 8) {
-	my $ups_cfg = read_host_template($device,'/etc/nagios/gen_template/ups.cfg');
-	if ($ups_cfg->{template}) {
-	    my @ups_cfg = @{$ups_cfg->{template}};
-	    if (@ups_cfg and scalar(@ups_cfg)) {
-		foreach my $row (@ups_cfg) {
-		    next if (!$row);
-    		    print(FH $row."\n");
-		    }
-		}
-	    }
-	}
+        }
+    close FH;
     }
-
-if ($custom_cfg->{template}) {
-    my @custom_cfg = @{$custom_cfg->{template}};
-    if (@custom_cfg and scalar(@custom_cfg)) {
-	foreach my $row (@custom_cfg) {
-	    next if (!$row);
-            print(FH $row."\n");
-	    }
-	}
-    }
-close(FH);
 }
-
-my @OU_list = get_records_sql($dbh,"SELECT * FROM OU WHERE nagios_dir IS NOT NULL");
-
-our %ou;
-our @cfg_dirs = ();
-
-foreach my $row (@OU_list) {
-next if (!$row->{nagios_dir});
-$ou{$row->{id}}=$row->{nagios_dir};
-push(@cfg_dirs,$row->{nagios_dir});
-}
-
 
 #---------------------------------------------------------------------------------
 

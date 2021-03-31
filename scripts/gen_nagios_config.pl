@@ -24,6 +24,23 @@ my %auths;
 
 my %dependency;
 
+my @OU_list = get_records_sql($dbh,"SELECT * FROM OU");
+my %ou;
+my @cfg_dirs = ();
+foreach my $row (@OU_list) {
+next if (!$row->{nagios_dir});
+if ($row->{nagios_dir}!~/\/etc\/nagios/) { $row->{nagios_dir}="/etc/nagios/".$row->{nagios_dir}; }
+$row->{nagios_dir}=~s/\/$//;
+$ou{$row->{id}}=$row;
+push(@cfg_dirs,$row->{nagios_dir});
+}
+
+my @Model_list = get_records_sql($dbh,"SELECT * FROM device_models");
+my %models;
+foreach my $row (@Model_list) {
+$models{$row->{id}}=$row;
+}
+
 my @netdev_list=get_records_sql($dbh,'SELECT * FROM devices WHERE deleted=0 and nagios=1');
 
 ##################################### Netdevices analyze ################################################
@@ -34,15 +51,26 @@ if (scalar(@netdev_list)>0) {
         $ip =~s/\/\d+$//g;
         my $device_id = 'netdev_'.$router->{'id'};
         $devices{$device_id}{ip}=$ip;
-        $devices{$device_id}{community}=$router->{'community'};
+        $devices{$device_id}{community}=$router->{'community'} || $config{snmp_default_community};
+        $devices{$device_id}{description}=translit($router->{'comment'});
         $devices{$device_id}{name} = $router->{'device_name'};
-        $devices{$device_id}{device_model} = $router->{'device_model'};
+        $devices{$device_id}{device_model_id} = $router->{'device_model_id'};
+        if ($router->{'device_model_id'}) {
+            $devices{$device_id}{device_model} = $models{$router->{'device_model_id'}};
+            }
         $devices{$device_id}{device_id} = $router->{'id'};
-        $devices{$device_id}{snmp_version} = $router->{'snmp_version'};
+        $devices{$device_id}{snmp_version} = $router->{'snmp_version'} || $config{snmp_default_version};
         if ($devices{$device_id}{snmp_version} eq '2') { $devices{$device_id}{snmp_version}='2c'; }
         $devices{$device_id}{vendor_id} = $router->{'vendor_id'};
-        if ($router->{'is_router'}) { $devices{$device_id}{type}='1'; } else { $devices{$device_id}{type}='2'; }
-        $devices{$device_id}{rw_community}=$router->{'rw_community'};
+        #1 - switch; 2 - router; 3 - auth
+        $devices{$device_id}{type}='1';
+        $devices{$device_id}{ou_id}='7';
+        if ($router->{'device_type'} eq 2) {
+            $devices{$device_id}{type}='2'; 
+            $devices{$device_id}{ou_id}='10';
+            }
+        $devices{$device_id}{ou}=$ou{$devices{$device_id}{ou_id}};
+        $devices{$device_id}{rw_community}=$router->{'rw_community'} || $config{snmp_default_community};
         $devices{$device_id}{fdb_snmp_index}=$router->{'fdb_snmp_index'};
         $devices{$device_id}{user_id}=$router->{'user_id'};
         #get uplinks
@@ -97,7 +125,13 @@ if (scalar(@auth_list)>0) {
         my $login = get_record_sql($dbh,"SELECT * FROM User_list WHERE id=".$auth->{'user_id'});
         $devices{$device_id}{user_login} = $login->{login};
         $devices{$device_id}{user_fio} = $login->{fio};
-	if ($login and $login->{ou_id}) { $devices{$device_id}{ou_id} = $login->{ou_id}; } else { $devices{$device_id}{ou_id} = 0; }
+        $devices{$device_id}{ou_id} = 0;
+	if ($login and $login->{ou_id} and $ou{$login->{ou_id}}->{nagios_dir}) { $devices{$device_id}{ou_id} = $login->{ou_id}; }
+        $devices{$device_id}{ou}=$ou{$devices{$device_id}{ou_id}};
+        $devices{$device_id}{device_model_id} = $auth->{'device_model_id'};
+        if ($auth->{'device_model_id'}) {
+            $devices{$device_id}{device_model} = $models{$auth->{'device_model_id'}};
+            }
 	#name
         if ($auth->{dns_name}) { $devices{$device_id}{name} = $auth->{dns_name}; }
         if (!$devices{$device_id}{name} and $auth->{dhcp_hostname}) { $devices{$device_id}{name} = $auth->{dhcp_hostname}; }
@@ -111,7 +145,7 @@ if (scalar(@auth_list)>0) {
     		$devices{$device_id}{name} = $login->{login}."_".$auth->{id};
     		}
     	    }
-        $devices{$device_id}{device_model} = $auth->{'host_model'};
+        $devices{$device_id}{description}=translit($auth->{'comments'}) || $devices{$device_id}{name};
         $devices{$device_id}{auth_id} = $auth->{'id'};
         $devices{$device_id}{nagios_handler} = $auth->{'nagios_handler'};
         $devices{$device_id}{link_check} = $auth->{'link_check'};
@@ -134,6 +168,9 @@ if (scalar(@auth_list)>0) {
     }
 
 foreach my $dir (@cfg_dirs) {
+    next if ($dir eq '/');
+    next if ($dir eq '/etc');
+    next if ($dir eq '/etc/nagios');
     mkdir $dir unless (-d $dir);
     unlink glob "$dir/*.cfg";
 }

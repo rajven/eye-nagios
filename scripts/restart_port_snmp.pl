@@ -48,14 +48,14 @@ my $snmp_index;
 my $community;
 my $snmp_version;
 
-my $d_sql="SELECT D.ip, D.device_name, D.vendor_id, D.device_model, DP.port, DP.snmp_index, D.rw_community, D.snmp_version  FROM devices AS D, device_ports AS DP, connections AS C WHERE D.snmp_version>0 and D.id = DP.device_id AND DP.id = C.port_id AND C.auth_id=$auth_id AND DP.uplink=0";
+my $d_sql="SELECT D.ip, D.device_name, D.vendor_id, D.device_model_id, DP.port, DP.snmp_index, D.rw_community, D.snmp_version  FROM devices AS D, device_ports AS DP, connections AS C WHERE D.snmp_version>0 and D.id = DP.device_id AND DP.id = C.port_id AND C.auth_id=$auth_id AND DP.uplink=0";
 
 my $dev_port = get_record_sql($dbh,$d_sql);
 
 if (!$dev_port) { db_log_error($dbh,"Connection for $HOST_IP not found! Bye."); exit; }
 
 my $ip=$dev_port->{ip};
-my $model=$dev_port->{device_model};
+my $model=$dev_port->{device_model_id};
 my $port=$dev_port->{port};
 my $vendor_id = $dev_port->{vendor_id};
 my $snmp_index=$dev_port->{snmp_index};
@@ -105,7 +105,7 @@ if ($poe_oid) {
     }
 
 if ($admin_oid) {
-    $ret=snmp_set_int($ip,$admin_oid,$poe_disabled_value,$community,161,$snmp_version);
+    $ret=snmp_set_int($ip,$admin_oid,$poe_disabled_value,$community,161,$snmp_version); 
     db_log_info($dbh,"Try shutdown port $port.");
     db_log_debug($dbh,"Send to oid: $admin_oid value: $poe_disabled_value");
     }
@@ -119,7 +119,7 @@ if ($admin_oid) {
     }
 
 if ($poe_oid) {
-    $ret=snmp_set_int($ip,$poe_oid,$poe_enabled_value,$community,161,$snmp_version);
+    $ret=snmp_set_int($ip,$poe_oid,$poe_enabled_value,$community,161,$snmp_version); 
     db_log_info($dbh,"Up port $port.");
     db_log_debug($dbh,"Send to oid: $poe_oid value: $poe_enabled_value");
     }

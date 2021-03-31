@@ -35,9 +35,9 @@ sub scan_ipcam {
 
 my $ip = shift;
 my $community = shift;
-my $result ='';
+my $result;
 
-#eval {
+eval {
 my ($session, $error) = Net::SNMP->session(
    -hostname  => $ip,
    -community => $community,
@@ -47,16 +47,18 @@ my ($session, $error) = Net::SNMP->session(
 
 $session->translate(TRANSLATE_NONE);
 my $ret = $session->get_request( -varbindlist => [@hik_oids] );
-$result = 'ip: '.$ip;
+$result->{text} = 'ip: '.$ip;
 foreach my $oid (keys %hik_snmp_oids) {
-    $result = $result." ".$hik_snmp_oids{$oid}.": ".$ret->{$oid};
+    $result->{text} = $result->{text}." ".$hik_snmp_oids{$oid}.": ".$ret->{$oid};
+    if ($hik_snmp_oids{$oid}=~/Model/i) { $result->{model_name}=$ret->{$oid}; }
     }
-$result = trim($result);
-#};
+$result->{text} = trim($result->{text});
+};
+
 return $result;
 }
 
-my @auth_list=get_custom_records($dbh,'SELECT * FROM User_auth WHERE deleted=0');
+my @auth_list=get_records_sql($dbh,'SELECT * FROM User_auth WHERE deleted=0 and nagios=1');
 
 ##################################### User auth analyze ################################################
 
@@ -67,13 +69,19 @@ if (scalar(@auth_list)>0) {
         $ip =~s/\/\d+$//g;
         $devices{$device_id}{ip}=$ip;
         #get user
-        my $login = get_custom_record($dbh,"SELECT * FROM User_list WHERE id=".$auth->{'user_id'});
+        my $login = get_record_sql($dbh,"SELECT * FROM User_list WHERE id=".$auth->{'user_id'});
         next if ($login->{ou_id} ne 5);
         $devices{$device_id}{device_model} = $auth->{'host_model'};
         $devices{$device_id}{dns_name} = $auth->{'dns_name'};
         $devices{$device_id}{auth_id} = $auth->{'id'};
-	my $snmp_info = scan_ipcam($auth->{ip},'jmtc321');
-	if ($snmp_info) { print $snmp_info."\n"; }
+	my $snmp_info = scan_ipcam($auth->{ip},'public');
+	if ($snmp_info->{model_name}) {
+	    print $snmp_info->{text}."\n";
+	    my $model = get_record_sql($dbh,"SELECT id FROM device_models WHERE model_name='".$snmp_info->{model_name}."'");
+	    if ($model) {
+	        do_sql($dbh,"UPDATE User_auth SET device_model_id=".$model->{id}." WHERE id=".$auth->{'id'});
+	        }
+            }
         }
     }
 

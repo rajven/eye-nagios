@@ -29,7 +29,7 @@ $|=1;
 
 if (IsNotRun($SPID)) { Add_PID($SPID); }  else { die "Warning!!! $SPID already runnning!\n"; }
 
-my @poe_mikrotik = get_records_sql($dbh,"SELECT * FROM devices WHERE deleted=0 and vendor_id=9 and device_model='CRS328-24P-4S+'");
+my @poe_mikrotik = get_records_sql($dbh,"SELECT * FROM devices WHERE deleted=0 and device_model_id=12");
 
 foreach my $device (@poe_mikrotik) {
 next if (!$device);
