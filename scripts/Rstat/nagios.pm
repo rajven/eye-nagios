@@ -105,20 +105,17 @@ return $result;
 
 sub print_single_host {
 my $device = shift;
-my $ping_enable = shift || 0;
 my $template = 'generic-host';
 my $default_service="local-service";
 
-if ($device->{ou_id}>0) {
-    $ping_enable = $device->{ou}->{nagios_ping};
-    if ($device->{ou}->{nagios_host_use}) { $template=$device->{ou}->{nagios_host_use}; }
-    if ($device->{ou}->{nagios_default_service}) { $default_service=$device->{ou}->{nagios_default_service}; }
-    }
+my $ping_enable = $device->{ou}->{nagios_ping};
+if ($device->{ou}->{nagios_host_use}) { $host_template=$device->{ou}->{nagios_host_use}; }
+if ($device->{ou}->{nagios_default_service}) { $default_service=$device->{ou}->{nagios_default_service}; }
 
 my $cfg_file = $device->{ou}->{nagios_dir}."/".$device->{name}.".cfg";
 open(FH, "> $cfg_file");
 print(FH "define host{\n");
-print(FH "       use                     $template\n");
+print(FH "       use                     $host_template\n");
 print(FH "       host_name               $device->{name}\n");
 print(FH "       alias                   $device->{name}\n");
 print(FH "       address                 $device->{ip}\n");
@@ -143,6 +140,7 @@ if ($ping_enable) {
 	print(FH "\n");
     }
 if ($device->{parent_name} and $device->{link_check} and $device->{parent_snmp_version}) {
+	#port status
         print(FH "define service{\n");
         print(FH "       use                        $default_service\n");
         print(FH "       host_name                  $device->{parent_name}\n");

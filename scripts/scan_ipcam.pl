@@ -74,7 +74,7 @@ if (scalar(@auth_list)>0) {
         $devices{$device_id}{device_model} = $auth->{'host_model'};
         $devices{$device_id}{dns_name} = $auth->{'dns_name'};
         $devices{$device_id}{auth_id} = $auth->{'id'};
-	my $snmp_info = scan_ipcam($auth->{ip},'public');
+	my $snmp_info = scan_ipcam($auth->{ip},$config_ref{snmp_default_community});
 	if ($snmp_info->{model_name}) {
 	    print $snmp_info->{text}."\n";
 	    my $model = get_record_sql($dbh,"SELECT id FROM device_models WHERE model_name='".$snmp_info->{model_name}."'");
