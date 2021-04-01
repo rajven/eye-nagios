@@ -105,7 +105,7 @@ return $result;
 
 sub print_single_host {
 my $device = shift;
-my $template = 'generic-host';
+my $host_template = 'generic-host';
 my $default_service="local-service";
 
 my $ping_enable = $device->{ou}->{nagios_ping};
