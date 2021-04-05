@@ -38,6 +38,8 @@ $ou{$row->{id}}=$row;
 push(@cfg_dirs,$row->{nagios_dir});
 }
 
+@cfg_dirs = uniq(@cfg_dirs);
+
 my @Model_list = get_records_sql($dbh,"SELECT * FROM device_models");
 my %models;
 foreach my $row (@Model_list) {
@@ -63,6 +65,7 @@ if (scalar(@netdev_list)>0) {
         $devices{$device_id}{snmp_version} = $router->{'snmp_version'} || $config_ref{snmp_default_version};
         if ($devices{$device_id}{snmp_version} eq '2') { $devices{$device_id}{snmp_version}='2c'; }
         $devices{$device_id}{vendor_id} = $router->{'vendor_id'};
+        $devices{$device_id}{ou_id} = 0;
         #1 - switch; 2 - router; 3 - auth
         $devices{$device_id}{type}='1';
         $devices{$device_id}{ou_id}='7';
@@ -70,7 +73,18 @@ if (scalar(@netdev_list)>0) {
             $devices{$device_id}{type}='2'; 
             $devices{$device_id}{ou_id}='10';
             }
+	if ($router->{'user_id'}) {
+            #get user
+	    my $login = get_record_sql($dbh,"SELECT * FROM User_list WHERE id=".$router->{'user_id'});
+	    if ($login and $login->{ou_id} and $ou{$login->{ou_id}}->{nagios_dir}) { $devices{$device_id}{ou_id} = $login->{ou_id}; }
+            }
         $devices{$device_id}{ou}=$ou{$devices{$device_id}{ou_id}};
+
+        if (!$devices{$device_id}{ou}->{nagios_dir}) {
+    	    if ($devices{$device_id}{type} eq '1') { $devices{$device_id}{ou}->{nagios_dir}='switches'; }
+    	    if ($devices{$device_id}{type} eq '2') { $devices{$device_id}{ou}->{nagios_dir}='routers'; }
+    	    }
+
         $devices{$device_id}{rw_community}=$router->{'rw_community'} || $config_ref{snmp_default_community};
         $devices{$device_id}{fdb_snmp_index}=$router->{'fdb_snmp_index'};
         $devices{$device_id}{user_id}=$router->{'user_id'};
