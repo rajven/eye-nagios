@@ -1,0 +1,29 @@
+#!/bin/sh
+
+### command line 1-Host 2-Communiti 3-MIB 4-Warning level
+
+### return codes
+RET_OK=0
+RET_WARNING=1
+RET_UNKNOWN=3
+RET_CRITICAL=2
+
+if [ -n "$1" -a "$2" -a "$3" -a "$4" ]; then
+ snmp_w=`snmpwalk $1 -c $2 -v1 IF-MIB::$3 -O v -O q`
+ val=$?
+ if [ $val -eq 0 ]; then 
+  if [ $snmp_w -lt $4 -a $snmp_w -ne 0 ]; then
+    echo "Link is WARNING! $snmp_w"; exit $RET_WARNING
+   elif [ $snmp_w -eq 0 ]; then 
+    echo "Link is CRITICAL! $snmp_w"; exit $RET_CRITICAL
+   elif [ $snmp_w -ge $4 ]; then
+    echo "Link is OK! $snmp_w"; exit $RET_OK
+   else
+    echo "Link is UNKNOWN! $snmp_w"; exit $RET_UNKNOWN   
+  fi
+ else
+  echo "Wrong Parameters! $snmp_w"; exit $RET_UNKNOWN 
+ fi 
+else
+ echo "Not Parameters! $snmp_w"; exit $RET_UNKNOWN
+fi

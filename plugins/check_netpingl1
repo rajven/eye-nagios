@@ -1,0 +1,44 @@
+#! /usr/bin/perl -w
+
+use strict;
+
+use Net::SNMP;
+
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || 161 
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $lin1 = '1.3.6.1.4.1.25728.8900.1.1.2.1';
+#my $lin2 = '1.3.6.1.4.1.25728.8900.1.1.2.2';
+#my $lin3 = '1.3.6.1.4.1.25728.8900.1.1.2.3';
+#my $lin4 = '1.3.6.1.4.1.25728.8900.1.1.2.4';
+
+my $result = $session->get_request(
+   -varbindlist => [$lin1]
+);
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+
+if ($result->{$lin1} < 1) {
+   print("ERROR!!! Out of 220V\n");
+   $session->close;
+   exit 2;
+}
+
+print("OK! 220V is ready\n");
+$session->close;
+exit 0;

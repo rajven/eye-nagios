@@ -1,0 +1,74 @@
+#! /usr/bin/perl -w
+
+use strict;
+use Net::SNMP;
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || 161
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+our %ZYXEL_MIBS = (
+    'model'=>'.1.3.6.1.2.1.1.1.0',
+    'serial'=>'.1.3.6.1.4.1.890.1.5.8.ID.1.10.0',
+    'fanRpmDescr'=>'.1.3.6.1.4.1.890.1.5.8.ID.9.1.1.6',
+    'fanTempDescr'=>'.1.3.6.1.4.1.890.1.5.8.ID.9.2.1.6',
+    'voltageDescr'=>'.1.3.6.1.4.1.890.1.5.8.ID.9.3.1.7'
+    );
+
+our %ZYXEL_MIBS_IDS = (
+    'ES-3124'=>'12',
+    'XGS-4728F'=>'46',
+    'ES-3124-4F'=>'26',
+    'MES-3728'=>'45',
+    'MES-3528'=>'51',
+    'ES-2024A'=>'16',
+    'ES-2108'=>'21',
+    'ES-2108-G'=>'19',
+    'MGS-3712F'=>'48',
+    'GS-4012F'=>'20'
+);
+
+my $ret = 0;
+
+my $result = $session->get_request( -varbindlist => [$ZYXEL_MIBS{model}]);
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+    }
+my $model = $result->{$ZYXEL_MIBS{model}};
+my $model_id = $ZYXEL_MIBS_IDS{$model};
+
+if (!$model_id) {
+    print("ERROR: Unknown switch\n");
+    $session->close;
+    exit 2;
+    }
+
+my $fan_oid = $ZYXEL_MIBS{fanRpmDescr};
+$fan_oid=~s /ID/$model_id/;
+
+$result = $session->get_table($fan_oid);
+my $fan_index = 1;
+
+for my $result_oid (keys %$result) {
+my $fan_state = $result->{$result_oid};
+if ($fan_state!~/normal/i) {
+	$ret = 2;
+	printf("ERROR Fan $fan_index! ",$fan_state);
+    }
+$fan_index++;
+}
+
+$session->close;
+if ($ret == 0) { print("OK Fan's\n"); } else { print "\n"; }
+exit $ret;

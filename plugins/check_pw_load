@@ -1,0 +1,44 @@
+#! /usr/bin/perl -w
+
+use strict;
+
+use Net::SNMP;
+
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || 161 
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $upsload = '1.3.6.1.2.1.33.1.4.4.1.5.1';
+
+my $result = $session->get_request(
+   -varbindlist => [$upsload]
+);
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+
+if ( $result->{$upsload} > 70 ) {
+   printf("WARNING!!! Loading on UPS: %s percents\n",$result->{$upsload});
+   $session->close;
+   exit 1;
+}
+
+
+
+printf("OK Loading on UPS %s percents\n", $result->{$upsload});
+$session->close;
+exit 0;
+

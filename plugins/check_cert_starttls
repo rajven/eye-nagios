@@ -1,0 +1,42 @@
+#!/bin/bash
+
+hostip=$1
+port=$2
+warn_days=$3
+crit_days=$4
+
+[ -z "${crit_days}" ] && crit_days=3
+[ -z "${warn_days}" ] && warn_days=10
+
+now=`date +%s`
+
+CERT_TXT=$(echo "QUIT" | LANG=C openssl s_client -starttls smtp -connect ${hostip}:${port} 2>/dev/null | sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' | openssl x509 -text -noout)
+
+NAME=$(echo "$CERT_TXT" | grep "Subject: OU=Domain Control Validated" | awk '{ print $NF }' | sed 's/CN=//')
+
+TIMESTAMP=$(echo "$CERT_TXT" | grep "Not After" | sed -r 's/\s+Not After\s+\://')
+
+expire_time=$(date +%s -d "${TIMESTAMP}")
+
+SEC_DIFF=$(( $expire_time - $now ))
+
+DAYS_DIFF=$(( $SEC_DIFF / 86400 ))
+
+if [ $expire_time -le $now ]; then
+    echo "CRIT! Expired cert ${NAME}"
+    exit 2
+    fi
+
+if [ $DAYS_DIFF -le $crit_days ]; then
+    echo "CRIT! Soon we will lose the certificate ${NAME} - only $DAYS_DIFF days left"
+    exit 2
+    fi
+
+if [ $DAYS_DIFF -le $warn_days ]; then
+    echo "WARN! we need to update the certificate ${NAME} - only $DAYS_DIFF days left"
+    exit 1
+    fi
+
+echo "OK! $DAYS_DIFF days left for ${NAME}"
+
+exit 0

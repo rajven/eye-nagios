@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Net::SNMP qw(ticks_to_time TRANSLATE_NONE);
+
+my $ip  = shift;
+my $community = shift || 'public';
+my $port = shift || '161';
+my $version = shift || '2';
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => $ip,
+   -community => $community,
+   -port      => $port,
+   -version   => $version
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my %hik_snmp_oids=(
+'.1.3.6.1.4.1.39165.1.5.0'=>'Number',
+'.1.3.6.1.4.1.39165.1.6.0'=>'Vendor',
+'.1.3.6.1.4.1.39165.1.1.0'=>'Model',
+'.1.3.6.1.4.1.39165.1.3.0'=>'Firmware',
+);
+
+my @hik_oids=();
+foreach my $oid (keys %hik_snmp_oids) {
+push (@hik_oids,$oid);
+}
+
+$session->translate(TRANSLATE_NONE);
+
+my $ret = $session->get_request( -varbindlist => [@hik_oids] );
+if (!defined($ret)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+$session->close;
+
+my $result = '';
+foreach my $oid (keys %hik_snmp_oids) {
+    $result = $result." ".$hik_snmp_oids{$oid}.": ".$ret->{$oid};
+    }
+$result =~s/^\s+//g;
+$result =~s/\s+$//g;
+
+printf("OK : $result\n");
+
+exit 0;

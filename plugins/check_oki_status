@@ -1,0 +1,84 @@
+#! /usr/bin/perl -w
+
+use strict;
+use Net::SNMP;
+
+my $RET_OK=0;
+my $RET_WARNING=1;
+my $RET_UNKNOWN=3;
+my $RET_CRITICAL=2;
+
+my $MSG_OK="OK";
+my $MSG_WARNING="WARN";
+my $MSG_CRITICAL="CRIT";
+
+my $hostip=$ARGV[0];
+
+exit if (!$hostip);
+
+sub ping {
+use Net::Ping;
+use Time::HiRes;
+my ($host,$time) = @_;
+my $p = Net::Ping->new();
+$p->hires();
+$time=1 if (!$time);
+my ($ret, $duration, $ip) = $p->ping($host, $time);
+$p->close();
+$ret ? return 1: return 0;
+}
+
+exit $RET_UNKNOWN if (!ping($hostip));
+
+eval {
+
+#set timout for script work.
+$SIG{ALRM} = sub { die "Timeout 55 sec reached.\n" };
+alarm 55;
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -version   => 1,
+   -timeout   => 30,
+   -community => shift || 'public',
+   -port      => shift || 161 
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $oki_status = '1.3.6.1.4.1.2001.1.3.1.1.10.4.0';
+
+my $oki_status2 = '1.3.6.1.4.1.2001.1.3.1.1.7.1.2.1.1';
+
+my $result = $session->get_request(
+   -varbindlist => [$oki_status]
+);
+
+if (!defined($result)) { $oki_status = $oki_status2; $result = $session->get_request(-varbindlist => [$oki_status]); }
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit $RET_CRITICAL;
+}
+
+my $ret_str = $result->{$oki_status};
+$session->close;
+
+if ($ret_str =~/error/i) {
+    print("ERROR: ".$ret_str."\n\n");
+    exit $RET_CRITICAL;
+    }
+if ($ret_str =~/warning/i) {
+    print("WARNING ".$ret_str."\n\n");
+    exit $RET_WARNING;
+    }
+
+print("OK ".$ret_str."\n\n");
+$SIG{ALRM} = 'DEFAULT';
+};
+
+exit $RET_OK;

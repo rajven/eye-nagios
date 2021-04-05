@@ -1,0 +1,51 @@
+#! /usr/bin/perl -w
+
+use strict;
+
+use Net::SNMP qw(ticks_to_time TRANSLATE_NONE);
+use POSIX;
+ 
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || 161 
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $timebat = '1.3.6.1.4.1.318.1.1.1.2.2.3.0';
+
+$session->translate(TRANSLATE_NONE);
+
+my $result = $session->get_request(
+   -varbindlist => [$timebat]
+);
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+
+
+my $perf="time=%s;0;10;0;1000;";
+my $timewait = floor($result->{$timebat}/6000);
+$session->close;
+
+if ($timewait >15) {
+    printf("OK: Before switching-off ups remains %s minutes |".$perf."\n",$timewait,$timewait);
+    exit 0;
+    }
+
+if ($timewait >10) {
+    printf("WARN: I'll be off soon! Before switching-off ups remains %s minutes |".$perf."\n",$timewait,$timewait);
+    exit 1;
+    }
+
+printf("CRIT: Goodbye comrades! Before switching-off ups remains %s minutes |".$perf."\n",$timewait,$timewait);
+exit 2;

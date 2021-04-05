@@ -1,0 +1,52 @@
+#!/bin/sh
+#/usr/lib64/nagios/plugins/check_icmp -H $HOSTADDRESS$ -w 3000.0,80% -c 5000.0,100% -p 1
+# usage of nagios: check_host_mping $ARGV1 $HOSTADDRESSES
+#        -- $ARGV1 - Quantity of addresses of a host
+#        -- $HOSTADDRESSES - ip the addresses of a host divided by a blank (it is no more 4)
+STAT=$1
+KIP=$1
+STRMES=""
+IP1=$2
+IP2=$3
+IP3=$4
+IP4=$5
+
+rez1=`/usr/lib64/nagios/plugins/check_icmp -H $IP1 -w 1000.0,80% -c 2000.0,100% -p 1 |grep OK`
+perf1=`echo "${rez1}" | awk -F="|" '{ print $2}' | awk '{print $1 }'`
+if [ ! "$rez1" ]; then
+    STAT=`expr $STAT - 1`
+else
+    STRMES=${STRMES}$IP1" "
+fi
+
+if [ $KIP -gt 1 ]; then
+    rez2=`/usr/lib64/nagios/plugins/check_icmp -H $IP2 -w 1000.0,80% -c 2000.0,100% -p 1 |grep OK`
+    if [ ! "$rez2" ]; then
+        STAT=`expr $STAT - 1`
+    else
+        STRMES=${STRMES}$IP2" "
+    fi
+    if [ $KIP -gt 2 ]; then
+        rez3=`/usr/lib64/nagios/plugins/check_icmp -H $IP3 -w 1000.0,80% -c 2000.0,100% -p 1 |grep OK`
+        if [ ! "$rez3" ]; then
+            STAT=`expr $STAT - 1`
+        else
+            STRMES=${STRMES}$IP3" "
+        fi
+        if [ $KIP -gt 3 ]; then
+            rez4=`/usr/lib64/nagios/plugins/check_icmp -H $IP4 -w 1000.0,80% -c 2000.0,100% -p 1 |grep OK`
+            if [ ! "$rez3" ]; then
+                STAT=`expr $STAT - 1`
+            else
+                STRMES=${STRMES}$IP4
+            fi
+        fi
+    fi
+fi
+
+if [ $STAT -eq 0 ]; then
+    echo "CRITICAL! Host Down!"
+    exit 2
+else
+    echo "OK! $STRMES  ip - $STAT of $KIP | ${perf1}"
+fi

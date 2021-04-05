@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+
+use strict;
+
+use Net::SNMP qw(ticks_to_time TRANSLATE_NONE);
+use DateTime;
+use DateTime::Format::Strptime;
+use Data::Dumper;
+
+my $warn_time = 365 * 5;
+
+my $hostip=$ARGV[0];
+my $community = $ARGV[1] || 'public';
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || $community,
+   -port      => shift || 161,
+);
+
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $inputline = '1.3.6.1.4.1.318.1.1.1.2.1.3.0';
+
+$session->translate(TRANSLATE_NONE);
+
+my $result = $session->get_request(
+   -varbindlist => [$inputline]
+);
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+
+$session->close;
+
+if (!defined($result->{$inputline})) {
+    printf("ERROR: %s.\n", $session->error);
+    $session->close;
+    exit 2;
+    }
+
+my $value = $result->{$inputline};
+
+my ($mm,$dd,$yy) = split(/\//,$value);
+
+if ($yy <2000 ) { $yy+=2000; }
+
+my $date = DateTime->new( year => $yy, month => $mm, day => $dd, time_zone => 'local');
+my $today = DateTime->today(time_zone=>'local');
+my $dur = $date->delta_days($today);
+
+my $timeshift = $dur->in_units('days');
+if ($timeshift > $warn_time) {
+    printf("WARN: The batteries are too old. It's time to change: %s\n", $value);
+    $session->close;
+    exit 1;
+    }
+
+printf("Last Battery Replacement : %s\n",$value);
+
+exit 0;

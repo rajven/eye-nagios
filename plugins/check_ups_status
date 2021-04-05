@@ -1,0 +1,125 @@
+#!/usr/bin/perl
+
+use strict;
+use Net::SNMP;
+
+my $debug = 0;
+
+my @ups_oids = (
+#apc ?
+'.1.3.6.1.4.1.318.1.1.1.4.1.1',
+#default
+'.1.3.6.1.2.1.33.1.6.3.2',
+#eaton
+'.1.3.6.1.4.1.534.1.12.2.1.2',
+);
+
+my $res_state = {
+'apc' =>{
+    '1' =>'ERROR Current APC status is  unknown(1)',
+    '2' =>'OK Current APC status is  onLine(2)',
+    '3' =>'WARNING Current APC status is  onBattery(3)',
+    '4' =>'OK Current APC status is  onSmartBoost(4)',
+    '5' =>'WARNING Current APC status is  timedSleeping(5)',
+    '6' =>'WARNING Current APC status is  softwareBypass(6)',
+    '7' =>'ERROR Current APC status is  off(7)',
+    '8' =>'WARNING Current APC status is  rebooting(8)',
+    '9' =>'WARNING Current APC status is  switchedBypass(9)',
+    '10' =>'ERROR Current APC status is  hardwareFailureBypass(10)',
+    '11' =>'WARNING Current APC status is  sleepingUntilPowerReturn(11)'
+    },
+'eaton' =>{
+    '1' => "OK UPS is on",
+    '2' => "ERROR! UPS is off",
+    '3' => "ERROR! UPS is pending Off",
+    '4' => "OK UPS is pending On",
+    '5' => "WARNING UPS state unknown!"
+    }
+};
+
+my $res_retcode = {
+'apc'=>{
+    '1' =>'2',
+    '2' =>'0',
+    '3' =>'1',
+    '4' =>'0',
+    '5' =>'1',
+    '6' =>'1',
+    '7' =>'2',
+    '8' =>'1',
+    '9' =>'1',
+    '10' =>'2',
+    '11' =>'1'
+    },
+'eaton'=>{
+    '1' => '0',
+    '2' => '2',
+    '3' => '2',
+    '4' => '0',
+    '5' => '3'
+    }
+};
+
+exit if (!$ARGV[0]);
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || '161',
+   -version   => shift || '1',
+);
+
+if (!defined($session)) { printf("ERROR: %s.\n", $error); exit 1; }
+
+my %result;
+foreach my $key (@ups_oids) {
+my $ret = $session->get_request( -varbindlist => [$key] );
+my $value;
+if (!$ret) {
+    #search in subtree
+    $ret = $session->get_next_request( -varbindlist => [$key] );
+    my $branch = $key.'.*';
+    my @keys_next = keys %$ret;
+    my $get_key = $keys_next[0];
+    if ($get_key=~/^$branch$/) {
+	$value = $ret->{$get_key};
+        print STDERR "Get-Next for key $key: $get_key => $value\n" if ($debug);
+	}
+    } else {
+    $value = $ret->{$key};
+    print STDERR "Get: $key => $value\n" if ($debug);
+    }
+next if (!defined($value));
+$result{$key}=$value;
+}
+$session->close;
+
+if (!%result) { printf("ERROR: Unknown model. Illegal oid list!\n"); exit 2; }
+
+my $result_ok = 0;
+foreach my $key (keys %result) {
+next if (!$key);
+my $return_value = $result{$key};
+next if (!defined($return_value));
+$result_ok = 1;
+#apc
+if ($key eq $ups_oids[0]) {
+    print($res_state->{apc}->{$return_value}."\n");
+    exit $res_retcode->{apc}->{$return_value};
+    }
+#default
+if ($key eq $ups_oids[1] and $return_value) {
+    printf("ERROR: Alarm OnBattery detected! %s\n", $return_value);
+    exit 2;
+    }
+#eaton
+if ($key eq $ups_oids[2]) {
+    print($res_state->{eaton}->{$return_value}."\n");
+    exit $res_retcode->{eaton}->{$return_value};
+    }
+}
+
+printf("OK Alarm OnBattery not found.\n\n");
+exit 0;

@@ -1,0 +1,87 @@
+#! /usr/bin/perl -w
+
+use strict;
+
+use Switch;
+
+use Net::SNMP;
+
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || 161 
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $upsstat = '1.3.6.1.4.1.318.1.1.1.4.1.1.0';
+
+my $result = $session->get_request(
+   -varbindlist => [$upsstat]
+);
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+
+switch($result->{$upsstat}) {
+    case 1 {
+	printf("Current APC status is  unknown(1) \n");
+	exit 2;
+    }
+    case 2 {
+	printf("Current APC status is  onLine(2) \n");
+	exit 0;
+    }
+    case 3 {
+	printf("Current APC status is  onBattery(3) \n");
+	exit 1;
+    }
+    case 4 {
+	printf("Current APC status is  onSmartBoost(4) \n");
+	exit 0;
+    }
+    case 5 {
+	printf("Current APC status is  timedSleeping(5) \n");
+	exit 1;
+    }
+    case 6 {
+	printf("Current APC status is  softwareBypass(6) \n");
+	exit 1;
+    }
+    case 7 {
+	printf("Current APC status is  off(7) \n");
+	exit 2;
+    }
+    case 8 {
+	printf("Current APC status is  rebooting(8) \n");
+	exit 1;
+    }
+    case 9 {
+	printf("Current APC status is  switchedBypass(9) \n");
+	exit 1;
+    }
+    case 10 {
+	printf("Current APC status is  hardwareFailureBypass(10) \n");
+	exit 2;
+    }
+    case 11 {
+	printf("Current APC status is  sleepingUntilPowerReturn(11) \n");
+	exit 1;
+    }
+    case 12 {
+#	printf("Current APC status is  onSmartTrim(12) \n");
+#	exit 1;
+    }
+}
+#printf("Current APC status is  %s \n", $result->{$upsstat});
+$session->close;
+#exit 0;

@@ -1,0 +1,68 @@
+#!/usr/bin/perl
+
+use strict;
+use Net::SNMP;
+
+my $debug = 0;
+
+my @ups_oids = (
+#default ups mib
+'.1.3.6.1.2.1.33.1.1.2',
+#apc
+'.1.3.6.1.4.1.318.1.1.1.1.1.1.0',
+#eaton
+'.1.3.6.1.4.1.534.1.1.2.0',
+);
+
+exit if (!$ARGV[0]);
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || '161',
+   -version   => shift || '1',
+);
+
+if (!defined($session)) { printf("ERROR: %s.\n", $error); exit 1; }
+
+my %result;
+foreach my $key (@ups_oids) {
+my $ret = $session->get_request( -varbindlist => [$key] );
+my $value;
+if (!$ret) {
+    #search in subtree
+    $ret = $session->get_next_request( -varbindlist => [$key] );
+    my $branch = $key.'.*';
+    my @keys_next = keys %$ret;
+    my $get_key = $keys_next[0];
+    if ($get_key=~/^$branch$/) {
+	$value = $ret->{$get_key};
+        print STDERR "Get-Next for key $key: $get_key => $value\n" if ($debug);
+	}
+    } else {
+    $value = $ret->{$key};
+    print STDERR "Get: $key => $value\n" if ($debug);
+    }
+next if (!defined($value));
+$result{$key}=$value;
+}
+$session->close;
+
+if (!%result) { printf("OK: Unknown model. Illegal oid list!\n"); exit 0; }
+
+my $result_ok = 0;
+my $return_value;
+foreach my $key (keys %result) {
+next if (!$key);
+$return_value = $result{$key};
+next if (!defined($return_value));
+$result_ok = 1;
+########### check space
+printf("OK! Model: %s \n",$return_value);
+exit 0;
+}
+
+printf("WARNING! You shouldn't have seen this. If you still see it, something clearly went wrong.\n");
+exit 3;

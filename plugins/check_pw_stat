@@ -1,0 +1,66 @@
+#! /usr/bin/perl -w
+
+use strict;
+
+use Switch;
+
+use Net::SNMP;
+
+
+my $hostip=$ARGV[0];
+
+my ($session, $error) = Net::SNMP->session(
+   -hostname  => shift || $hostip,
+   -community => shift || 'public',
+   -port      => shift || 161 
+);
+
+if (!defined($session)) {
+   printf("ERROR: %s.\n", $error);
+   exit 1;
+}
+
+my $upsstat = '1.3.6.1.2.1.33.1.4.1.0';
+
+my $result = $session->get_request(
+   -varbindlist => [$upsstat]
+);
+
+if (!defined($result)) {
+   printf("ERROR: %s.\n", $session->error);
+   $session->close;
+   exit 2;
+}
+
+switch($result->{$upsstat}) {
+    case 1 {
+	printf("Current UPS status is  other(1) \n");
+	exit 1;
+    }
+    case 2 {
+	printf("Current UPS status is  none(2) \n");
+	exit 1;
+    }
+    case 3 {
+	printf("Current UPS status is  normal(3) \n");
+	exit 0;
+    }
+    case 4 {
+	printf("Current UPS status is  bypass(4) \n");
+	exit 1;
+    }
+    case 5 {
+	printf("Current UPS status is  battery(5) \n");
+	exit 2;
+    }
+    case 6 {
+	printf("Current UPS status is  booster(6) \n");
+	exit 2;
+    }
+    case 7 {
+	printf("Current UPS status is  reducer(7) \n");
+	exit 2;
+    }
+}
+$session->close;
+#exit 0;
