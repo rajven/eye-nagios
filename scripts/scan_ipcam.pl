@@ -51,6 +51,7 @@ $result->{text} = 'ip: '.$ip;
 foreach my $oid (keys %hik_snmp_oids) {
     $result->{text} = $result->{text}." ".$hik_snmp_oids{$oid}.": ".$ret->{$oid};
     if ($hik_snmp_oids{$oid}=~/Model/i) { $result->{model_name}=$ret->{$oid}; }
+    if ($hik_snmp_oids{$oid}=~/Firmware/i) { $result->{firmware}=$ret->{$oid}; }
     }
 $result->{text} = trim($result->{text});
 };
@@ -67,21 +68,24 @@ if (scalar(@auth_list)>0) {
         next if (!$auth);
         my $ip = $auth->{'ip'};
         $ip =~s/\/\d+$//g;
-        $devices{$device_id}{ip}=$ip;
         #get user
         my $login = get_record_sql($dbh,"SELECT * FROM User_list WHERE id=".$auth->{'user_id'});
         next if ($login->{ou_id} ne 5);
-        $devices{$device_id}{device_model} = $auth->{'host_model'};
-        $devices{$device_id}{dns_name} = $auth->{'dns_name'};
-        $devices{$device_id}{auth_id} = $auth->{'id'};
-	my $snmp_info = scan_ipcam($auth->{ip},$config_ref{snmp_default_community});
-	if ($snmp_info->{model_name}) {
-	    print $snmp_info->{text}."\n";
-	    my $model = get_record_sql($dbh,"SELECT id FROM device_models WHERE model_name='".$snmp_info->{model_name}."'");
-	    if ($model) {
-	        do_sql($dbh,"UPDATE User_auth SET device_model_id=".$model->{id}." WHERE id=".$auth->{'id'});
-	        }
-            }
+	my $snmp_info = scan_ipcam($auth->{ip},$confgi_ref{snmp_default_community});
+	if ($snmp_info) {
+            if ($snmp_info->{firmware} and ($auth->{firmware} ne $snmp_info->{firmware})) {
+                do_sql($dbh,"UPDATE User_auth SET firmware='".$snmp_info->{firmware}."' WHERE id=".$auth->{'id'}); 
+                }
+            if ($snmp_info->{model_name}) {
+	        my $model = get_record_sql($dbh,"SELECT id FROM device_models WHERE model_name='".$snmp_info->{model_name}."'");
+        	if ($model and $auth->{device_model_id} ne $model->{id}) {
+                    print "Updated: ".$snmp_info->{text}."\n";
+	            do_sql($dbh,"UPDATE User_auth SET device_model_id=".$model->{id}." WHERE id=".$auth->{'id'});
+	            } else {
+	            print "OK: ".$snmp_info->{text}."\n";
+	            }
+                }
+            } else { print "Fail: ".$ip."\n"; }
         }
     }
 

@@ -18,6 +18,9 @@ use Rstat::config;
 use Rstat::main;
 use Rstat::nagios;
 use Rstat::mysql;
+use Fcntl qw(:flock);
+open(SELF,"<",$0) or die "Cannot open $0 - $!";
+flock(SELF, LOCK_EX|LOCK_NB) or exit 1;
 
 my %devices;
 my %auths;

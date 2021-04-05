@@ -21,6 +21,9 @@ use Rstat::mysql;
 use DBI;
 use utf8;
 use open ":encoding(utf8)";
+use Fcntl qw(:flock);
+open(SELF,"<",$0) or die "Cannot open $0 - $!";
+flock(SELF, LOCK_EX|LOCK_NB) or exit 1;
 
 #exit;
 #$debug = 1;
