@@ -12,7 +12,6 @@ use FileHandle;
 use Data::Dumper;
 use Rstat::config;
 use Rstat::main;
-use Rstat::mikrotik;
 use Rstat::cmd;
 use Net::Patricia;
 use Date::Parse;
@@ -22,6 +21,7 @@ use DBI;
 use utf8;
 use open ":encoding(utf8)";
 use Fcntl qw(:flock);
+
 open(SELF,"<",$0) or die "Cannot open $0 - $!";
 flock(SELF, LOCK_EX|LOCK_NB) or exit 1;
 
@@ -51,7 +51,24 @@ $work_list{'ether'.$auth->{port}}=$auth->{ip};
 
 db_log_verbose($dbh,"Sync link monitor at $switch_name [".$switch_ip."] started.");
 
-my $t = Login_Mikrotik($switch_ip);
+#router
+if ($device->{device_type} eq '2') {
+    #mikrotik
+    if ($device->{vendor_id} eq '9') { $device->{port}='60023'; }
+    $device->{login}=$router_login;
+    $device->{password}=$router_password;
+    }
+
+#switch
+if ($device->{device_type} eq '1') {
+    #mikrotik
+    if ($device->{vendor_id} eq '9') { $device->{port}='60023'; }
+    $device->{login}='admin';
+    $device->{password}=$sw_password;
+    }
+
+my $t = netdev_login($device);
+log_cmd($t,"/system note set show-at-login=no",1,$t->prompt);
 
 #/interface ethernet terse
 #/interface ethernet set [ find default-name=ether1 ] loop-protect=on power-cycle-ping-address=192.168.22.51 power-cycle-ping-enabled=yes power-cycle-ping-timeout=3m speed=100Mbps

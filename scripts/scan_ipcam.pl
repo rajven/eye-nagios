@@ -18,6 +18,9 @@ use Net::SNMP qw(ticks_to_time TRANSLATE_NONE);
 use Rstat::config;
 use Rstat::main;
 use Rstat::mysql;
+use Fcntl qw(:flock);
+open(SELF,"<",$0) or die "Cannot open $0 - $!";
+flock(SELF, LOCK_EX|LOCK_NB) or exit 1;
 
 my %hik_snmp_oids=(
 '.1.3.6.1.4.1.39165.1.1.0'=>'Model',
