@@ -51,24 +51,8 @@ $work_list{'ether'.$auth->{port}}=$auth->{ip};
 
 db_log_verbose($dbh,"Sync link monitor at $switch_name [".$switch_ip."] started.");
 
-#router
-if ($device->{device_type} eq '2') {
-    #mikrotik
-    if ($device->{vendor_id} eq '9') { $device->{port}='60023'; }
-    $device->{login}=$router_login;
-    $device->{password}=$router_password;
-    }
-
-#switch
-if ($device->{device_type} eq '1') {
-    #mikrotik
-    if ($device->{vendor_id} eq '9') { $device->{port}='60023'; }
-    $device->{login}='admin';
-    $device->{password}=$sw_password;
-    }
-
+$device = netdev_set_auth($device);
 my $t = netdev_login($device);
-log_cmd($t,"/system note set show-at-login=no",1,$t->prompt);
 
 #/interface ethernet terse
 #/interface ethernet set [ find default-name=ether1 ] loop-protect=on power-cycle-ping-address=192.168.22.51 power-cycle-ping-enabled=yes power-cycle-ping-timeout=3m speed=100Mbps
