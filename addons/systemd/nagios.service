@@ -1,20 +1,21 @@
 [Unit]
 Description=Nagios Core 4.4.6
 Documentation=https://www.nagios.org/documentation
-After=network.target local-fs.target
+After=network.target local-fs.target hoststate-monitor.service
+PartOf=hoststate-monitor.service
 
 [Service]
 Type=forking
 User=nagios
 Group=nagios
 ExecStartPre=/usr/sbin/nagios -v /etc/nagios/nagios.cfg
-ExecStartPre=/bin/mkfifo /var/spool/nagios/hoststate.socket
 ExecStart=/usr/sbin/nagios -d /etc/nagios/nagios.cfg
 ExecStop=/usr/bin/kill -s TERM ${MAINPID}
 ExecStopPost=/usr/bin/rm -f /var/rw/nagios.cmd
-ExecStopPost=/usr/bin/rm -f /var/spool/nagios/hoststate.socket
 ExecReload=/usr/sbin/nagios -v /etc/nagios/nagios.cfg
 ExecReload=/usr/bin/kill -s HUP ${MAINPID}
+RestartSec=30
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
