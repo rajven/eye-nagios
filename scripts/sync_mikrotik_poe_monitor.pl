@@ -19,7 +19,6 @@ use Rstat::net_utils;
 use Rstat::mysql;
 use DBI;
 use utf8;
-use open ":encoding(utf8)";
 use Fcntl qw(:flock);
 
 open(SELF,"<",$0) or die "Cannot open $0 - $!";
@@ -49,9 +48,11 @@ next if (!$auth);
 $work_list{'ether'.$auth->{port}}=$auth->{ip};
 }
 
+$device = netdev_set_auth($device);
+$device->{login}.='+ct400w';
+
 db_log_verbose($dbh,"Sync link monitor at $switch_name [".$switch_ip."] started.");
 
-$device = netdev_set_auth($device);
 my $t = netdev_login($device);
 
 #/interface ethernet terse
@@ -59,7 +60,7 @@ my $t = netdev_login($device);
 #/interface ethernet set [ find default-name=ether2 ] loop-protect=on speed=100Mbps
 
 #fetch current
-my @current_monitor=log_cmd4($t,'/interface ethernet export terse');
+my @current_monitor=netdev_cmd($device,$t,'ssh','/interface ethernet export terse',1);
 @current_monitor=grep(/power/,@current_monitor);
 
 my %current_list;
@@ -99,10 +100,8 @@ if (!defined $current_list{$work_port}) {
 }
 
 if (scalar(@cmd_list)) {
-    foreach my $cmd (@cmd_list) {
-	db_log_debug($dbh,"$cmd");
-        log_cmd($t,$cmd);
-        }
+    netdev_cmd($device,$t,'ssh',\@cmd_list,1);
+    if ($debug) { foreach my $cmd (@cmd_list) { db_log_debug($dbh,"$cmd"); } }
     }
 
 db_log_verbose($dbh,"Sync link monitor at $switch_name [".$switch_ip."] stopped.");
