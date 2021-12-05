@@ -132,19 +132,34 @@ if (scalar(@auth_list)>0) {
         next if (!$auth);
         my $ip = $auth->{'ip'};
         $ip =~s/\/\d+$//g;
+
         #skip doubles
         my $device_id = 'auth_'.$auth->{'id'};
         next if ($devices{$device_id});
+
+	#skip user device with few ip
+        my $auth_count = get_count_records($dbh,"User_auth","user_id=".$auth->{'user_id'}." AND deleted=0");
+        next if ($auth_count>1);
+
+	#skip switches and routers
+        my $auth_device = get_record_sql($dbh,"SELECT * FROM devices WHERE user_id=".$auth->{'user_id'});
+	next if ($auth_device->{type}<=2);
+	
         $devices{$device_id}{ip}=$ip;
+
         #get user
         my $login = get_record_sql($dbh,"SELECT * FROM User_list WHERE id=".$auth->{'user_id'});
+    
         $devices{$device_id}{user_login} = $login->{login};
         $devices{$device_id}{user_fio} = $login->{fio};
         $devices{$device_id}{ou_id} = 0;
 	if ($login and $login->{ou_id} and $ou{$login->{ou_id}}->{nagios_dir}) { $devices{$device_id}{ou_id} = $login->{ou_id}; }
         $devices{$device_id}{ou}=$ou{$devices{$device_id}{ou_id}};
-        $devices{$device_id}{device_model_id} = $auth->{'device_model_id'};
-        if ($auth->{'device_model_id'}) { $devices{$device_id}{device_model} = $models{$auth->{'device_model_id'}}; }
+        
+        
+        $devices{$device_id}{device_model_id} = $auth_device->{'device_model_id'};
+        if ($auth_device->{'device_model_id'}) { $devices{$device_id}{device_model} = $models{$auth_device->{'device_model_id'}}; }
+        
 	#name
         if ($auth->{dns_name}) { $devices{$device_id}{name} = $auth->{dns_name}; }
         if (!$devices{$device_id}{name} and $auth->{dhcp_hostname}) { $devices{$device_id}{name} = $auth->{dhcp_hostname}; }
