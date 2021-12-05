@@ -32,7 +32,7 @@ my %ou;
 my @cfg_dirs = ();
 foreach my $row (@OU_list) {
 next if (!$row->{nagios_dir});
-if ($row->{nagios_dir}!~/\/etc\/nagios/) { $row->{nagios_dir}="/etc/nagios/".$row->{nagios_dir}; }
+if ($row->{nagios_dir}!~/^$config_ref{nagios_dir}/) { $row->{nagios_dir}=$config_ref{nagios_dir}.'/'.$row->{nagios_dir}; }
 $row->{nagios_dir}=~s/\/$//;
 $ou{$row->{id}}=$row;
 push(@cfg_dirs,$row->{nagios_dir});
@@ -198,7 +198,7 @@ if (scalar(@auth_list)>0) {
 foreach my $dir (@cfg_dirs) {
     next if ($dir eq '/');
     next if ($dir eq '/etc');
-    next if ($dir eq '/etc/nagios');
+    next if ($dir eq $config_ref{nagios_dir});
     mkdir $dir unless (-d $dir);
     unlink glob "$dir/*.cfg";
 }
@@ -214,7 +214,7 @@ print_nagios_cfg($device);
 
 ####################### Dependency ###########################
 
-open(FH,">","/etc/nagios/dependency/dep_hosts.cfg");
+open(FH,">",$config_ref{nagios_dir}."/dependency/dep_hosts.cfg");
 foreach my $device_name (keys %dependency) {
 my @dep_list=@{$dependency{$device_name}};
 if (@dep_list and scalar(@dep_list)) {
