@@ -37,7 +37,9 @@ push (@hik_oids,$oid);
 sub scan_ipcam {
 
 my $ip = shift;
-my $community = shift;
+my $community = shift || $config_ref{snmp_default_version};
+my $version = shift || $config_ref{snmp_default_community};
+
 my $result;
 
 eval {
@@ -45,7 +47,7 @@ my ($session, $error) = Net::SNMP->session(
    -hostname  => $ip,
    -community => $community,
    -port      => 161,
-   -version   => '2'
+   -version   => $version
 );
 
 $session->translate(TRANSLATE_NONE);
@@ -74,16 +76,33 @@ if (scalar(@auth_list)>0) {
         #get user
         my $login = get_record_sql($dbh,"SELECT * FROM User_list WHERE id=".$auth->{'user_id'});
         next if ($login->{ou_id} ne 5);
-	my $snmp_info = scan_ipcam($auth->{ip},$config_ref{snmp_default_version});
+        my $cam_dev = get_record_sql($dbh,"SELECT * FROM devices WHERE user_id=".$auth->{'user_id'});
+        my $d_community=undef;
+        my $d_version=undef;
+        if ($cam_dev) {
+    	    if ($cam_dev->{snmp_version}) { $d_version=$cam_dev->{snmp_version}; }
+    	    if ($cam_dev->{community}) { $d_community=$cam_dev->{community}; }
+    	    }
+	my $snmp_info = scan_ipcam($auth->{ip},$d_community,$d_version);
 	if ($snmp_info) {
-            if ($snmp_info->{firmware} and ($auth->{firmware} ne $snmp_info->{firmware})) {
-                do_sql($dbh,"UPDATE User_auth SET firmware='".$snmp_info->{firmware}."' WHERE id=".$auth->{'id'}); 
+	    if (!$cam_dev) {
+		$cam_dev->{user_id}=$auth->{'user_id'};
+		$cam_dev->{device_type}=5;
+		$cam_dev->{ip}=$auth->{'ip'};
+		$cam_dev->{device_name}=$login->{login};
+		$cam_dev->{snmp_version}=$config_ref{snmp_default_version};
+		$cam_dev->{community}=$config_ref{snmp_default_community};
+		my $new_dev_id = insert_record($dbh,"devices",$cam_dev);
+		$cam_dev = get_record_sql($dbh,"SELECT * FROM devices WHERE user_id=".$auth->{'user_id'});
+		}
+            if ($snmp_info->{firmware} and ($cam_dev->{firmware} ne $snmp_info->{firmware})) {
+                do_sql($dbh,"UPDATE devices SET firmware='".$snmp_info->{firmware}."' WHERE id=".$cam_dev->{'id'}); 
                 }
             if ($snmp_info->{model_name}) {
 	        my $model = get_record_sql($dbh,"SELECT id FROM device_models WHERE model_name='".$snmp_info->{model_name}."'");
-        	if ($model and $auth->{device_model_id} ne $model->{id}) {
+        	if ($model and $cam_dev->{device_model_id} ne $model->{id}) {
                     print "Updated: ".$snmp_info->{text}."\n";
-	            do_sql($dbh,"UPDATE User_auth SET device_model_id=".$model->{id}." WHERE id=".$auth->{'id'});
+	            do_sql($dbh,"UPDATE devices SET device_model_id=".$model->{id}." WHERE id=".$cam_dev->{'id'});
 	            } else {
 	            print "OK: ".$snmp_info->{text}."\n";
 	            }

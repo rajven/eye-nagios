@@ -103,11 +103,7 @@ if ($hoststate=~/UNREACHABLE/i) { $hoststate='DOWN'; }
 my $old_state = 'HARDDOWN';
 
 my $device;
-if ($hosttype=~/device/i) {
-    $device = get_record_sql($hdb,'SELECT nagios_status FROM devices WHERE id='.$hostid);
-    } else {
-    $device = get_record_sql($hdb,'SELECT nagios_status,nagios_handler FROM User_auth WHERE id='.$hostid);
-    }
+if ($hosttype=~/device/i) { $device = get_record_sql($hdb,'SELECT nagios_status FROM devices WHERE id='.$hostid);  }
 
 if ($device->{nagios_status}) { $old_state = $device->{nagios_status}; }
 
