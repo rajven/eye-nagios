@@ -37,8 +37,8 @@ push (@hik_oids,$oid);
 sub scan_ipcam {
 
 my $ip = shift;
-my $community = shift || $config_ref{snmp_default_version};
-my $version = shift || $config_ref{snmp_default_community};
+my $community = shift || $config_ref{snmp_default_community};
+my $version = shift || $config_ref{snmp_default_version};
 
 my $result;
 
