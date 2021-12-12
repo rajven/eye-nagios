@@ -164,9 +164,9 @@ my $device = shift;
 return if (!$device);
 my $device_id = $device->{device_id};
 my $custom_cfg;
-my $device_custom_cfg = "/etc/nagios/custom-cfg/".$device->{name}.".cfg";
+my $device_custom_cfg = $config_ref{nagios_dir}."/custom-cfg/".$device->{name}.".cfg";
 if (-e $device_custom_cfg) { $custom_cfg = read_host_template($device,$device_custom_cfg); }
-$device_custom_cfg = "/etc/nagios/custom-cfg/".$device_id.".cfg";
+$device_custom_cfg = $config_ref{nagios_dir}."/custom-cfg/".$device_id.".cfg";
 if (-e $device_custom_cfg) { $custom_cfg = read_host_template($device,$device_custom_cfg); }
 my $default_service="local-service";
 
@@ -272,7 +272,7 @@ if ($device->{type} eq 3) {
     my $cfg_file = print_single_host($device);
     open(FH, ">> $cfg_file");
     my $dev_cfg;
-    if ($device->{device_model} and $device->{device_model}->{nagios_template}) { $dev_cfg = read_host_template($device,'/etc/nagios/gen_template/'.$device->{device_model}->{nagios_template}); }
+    if ($device->{device_model} and $device->{device_model}->{nagios_template}) { $dev_cfg = read_host_template($device,$config_ref{nagios_dir}.'/gen_template/'.$device->{device_model}->{nagios_template}); }
     if ($dev_cfg and $dev_cfg->{template}) {
 	    my @dev_cfg = @{$dev_cfg->{template}};
 	    if (@dev_cfg and scalar(@dev_cfg)) {
