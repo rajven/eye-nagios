@@ -46,7 +46,8 @@ foreach my $row (@Model_list) {
 $models{$row->{id}}=$row;
 }
 
-my @netdev_list=get_records_sql($dbh,'SELECT * FROM devices WHERE deleted=0 and nagios=1');
+#switches & routers only
+my @netdev_list=get_records_sql($dbh,'SELECT * FROM devices WHERE deleted=0 and nagios=1 and device_type<=2');
 
 ##################################### Netdevices analyze ################################################
 if (scalar(@netdev_list)>0) {
@@ -67,6 +68,7 @@ if (scalar(@netdev_list)>0) {
         $devices{$device_id}{vendor_id} = $router->{'vendor_id'};
         $devices{$device_id}{ou_id} = 0;
         #1 - switch; 2 - router; 3 - auth
+        #NOT DEVICE TYPE IN DB!!!
         $devices{$device_id}{type}='1';
         $devices{$device_id}{ou_id}='7';
         if ($router->{'device_type'} eq 2) {
@@ -85,6 +87,8 @@ if (scalar(@netdev_list)>0) {
     	    if ($devices{$device_id}{type} eq '2') { $devices{$device_id}{ou}->{nagios_dir}='routers'; }
     	    }
 
+	$devices{$device_id}{snmp_version}=$router->{'snmp_version'} || $config_ref{snmp_default_version};
+	$devices{$device_id}{community}=$router->{'community'} || $config_ref{snmp_default_community};
         $devices{$device_id}{rw_community}=$router->{'rw_community'} || $config_ref{snmp_default_community};
         $devices{$device_id}{fdb_snmp_index}=$router->{'fdb_snmp_index'};
         $devices{$device_id}{user_id}=$router->{'user_id'};
@@ -143,8 +147,20 @@ if (scalar(@auth_list)>0) {
 
 	#skip switches and routers
         my $auth_device = get_record_sql($dbh,"SELECT * FROM devices WHERE user_id=".$auth->{'user_id'});
-	next if ($auth_device->{type}<=2);
-	
+	next if ($auth_device and $auth_device->{device_type}<=2);
+
+	#snmp parameters
+	if ($auth_device) {
+		$devices{$device_id}{snmp_version}=$auth_device->{snmp_version};
+		$devices{$device_id}{community}=$auth_device->{community};
+		$devices{$device_id}{rw_community}=$auth_device->{rw_community};
+		$devices{$device_id}{name}=$auth_device->{device_name};
+		} else {
+		$devices{$device_id}{snmp_version}=$config_ref{snmp_default_version};
+		$devices{$device_id}{community}=$config_ref{snmp_default_community};
+		$devices{$device_id}{rw_community}=$config_ref{snmp_default_community};
+		}
+
         $devices{$device_id}{ip}=$ip;
 
         #get user
@@ -156,21 +172,19 @@ if (scalar(@auth_list)>0) {
 	if ($login and $login->{ou_id} and $ou{$login->{ou_id}}->{nagios_dir}) { $devices{$device_id}{ou_id} = $login->{ou_id}; }
         $devices{$device_id}{ou}=$ou{$devices{$device_id}{ou_id}};
         
-        
         $devices{$device_id}{device_model_id} = $auth_device->{'device_model_id'};
         if ($auth_device->{'device_model_id'}) { $devices{$device_id}{device_model} = $models{$auth_device->{'device_model_id'}}; }
         
 	#name
-        if ($auth->{dns_name}) { $devices{$device_id}{name} = $auth->{dns_name}; }
-        if (!$devices{$device_id}{name} and $auth->{dhcp_hostname}) { $devices{$device_id}{name} = $auth->{dhcp_hostname}; }
+        if (!$devices{$device_id}{name} and $auth->{dns_name}) { $devices{$device_id}{name} = $auth->{dns_name}; }
         if (!$devices{$device_id}{name}) {
-    	    if ($auth->{comments}) {
-    		$devices{$device_id}{name} = translit($auth->{comments});
+    	    if ($login->{login}) {
+    		$devices{$device_id}{name} = translit($login->{login});
     		$devices{$device_id}{name}=~s/\(/-/g;
     		$devices{$device_id}{name}=~s/\)/-/g;
     		$devices{$device_id}{name}=~s/--/-/g;
     		} else {
-    		$devices{$device_id}{name} = $login->{login}."_".$auth->{id};
+    		$devices{$device_id}{name} = "auth_id_".$auth->{id};
     		}
     	    }
         $devices{$device_id}{description}=translit($auth->{'comments'}) || $devices{$device_id}{name};

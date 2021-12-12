@@ -146,6 +146,8 @@ $config_ref{sw_login}=$Config->{_}->{sw_login} || 'admin';
 $config_ref{sw_password}=$Config->{_}->{sw_password} || 'admin';
 $config_ref{nagios_dir}=$Config->{_}->{nagios_dir} || '/etc/nagios';
 $config_ref{nagios_dir}=~s/\/$//;
+$config_ref{nagios_cmd}=$Config->{_}->{nagios_cmd} || '/var/spool/nagios/cmd/nagios.cmd';
+$config_ref{nagios_event_socket}=$Config->{_}->{nagios_event_socket} || '/var/spool/nagios/hoststate.socket';
 
 our $MY_NAME=$FN[-1];
 our $SPID="/var/run/".$FN[-1];

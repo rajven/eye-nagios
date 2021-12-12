@@ -18,7 +18,6 @@ use Data::Dumper;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(
-$nag_cmd
 nagios_send_command
 nagios_host_svc_disable
 nagios_host_svc_enable
@@ -29,16 +28,14 @@ print_nagios_cfg
 BEGIN
 {
 
-our $nag_cmd = "/var/spool/nagios/cmd/nagios.cmd";
-
 #---------------------------------------------------------------------------------
 
 sub nagios_send_command {
 my $command = shift;
 next if (!$command);
-if (!-e $nag_cmd) { die("Command socket $nag_cmd not found!"); }
-log_info("Send command: $command to $nag_cmd");
-open(FH, ">> $nag_cmd");
+if (!-e $config_ref{nagios_cmd}) { die("Command socket $config_ref{nagios_cmd} not found!"); }
+log_info("Send command: $command to $config_ref{nagios_cmd}");
+open(FH, ">> $config_ref{nagios_cmd}");
 print FH "$command\n";
 close(FH);
 }
@@ -200,8 +197,8 @@ if ($device->{type} ~~ [1,2]) {
     print(FH "       host_name               $device->{name}\n");
     print(FH "       alias                   $device->{name}\n");
     print(FH "       address                 $device->{ip}\n");
-    print(FH "       _ID                 $device->{device_id}\n");
-    print(FH "       _TYPE                 device\n");
+    print(FH "       _ID                     $device->{device_id}\n");
+    print(FH "       _TYPE                   device\n");
     if ($device->{device_model}) {
 	print(FH "       notes		$device->{device_model}->{model_name}\n");
 	}

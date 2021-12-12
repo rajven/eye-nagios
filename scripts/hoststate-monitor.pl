@@ -21,7 +21,6 @@ use Proc::Daemon;
 use Cwd;
 
 my $pf = '/var/run/nagios/hoststate-monitor.pid';
-my $socket_path='/var/spool/nagios/hoststate.socket';
 
 my $daemon = Proc::Daemon->new(
         pid_file => $pf,
@@ -86,11 +85,14 @@ eval {
 my $hdb = DBI->connect("dbi:mysql:database=$DBNAME;host=$DBHOST","$DBUSER","$DBPASS");
 if ( !defined $hdb ) { die "Cannot connect to mySQL server: $DBI::errstr\n"; }
 
-open(hoststate,$socket_path) || die("Error open fifo socket $socket_path: $!");
+open(hoststate,$config_ref{nagios_event_socket}) || die("Error open fifo socket $config_ref{nagios_event_socket}: $!");
 
 while (my $logline = <hoststate>) {
 next unless defined $logline;
 chomp($logline);
+
+db_log_verbose($hdb,"GET:".$logline);
+
 my ($date,$hoststate,$hoststatetype,$hostname,$hostip,$hostid,$hosttype,$svc_control)= split (/\|/, $logline);
 next if (!$hostid);
 
@@ -103,9 +105,20 @@ if ($hoststate=~/UNREACHABLE/i) { $hoststate='DOWN'; }
 my $old_state = 'HARDDOWN';
 
 my $device;
-if ($hosttype=~/device/i) { $device = get_record_sql($hdb,'SELECT nagios_status FROM devices WHERE id='.$hostid);  }
+my $auth;
+my $login;
 
-if ($device->{nagios_status}) { $old_state = $device->{nagios_status}; }
+if ($hosttype=~/device/i) {
+    $device = get_record_sql($hdb,'SELECT * FROM devices WHERE id='.$hostid);
+    $login = get_record_sql($hdb,'SELECT * FROM User_list WHERE id='.$device->{user_id});
+    $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE user_id='.$device->{user_id}.' AND deleted=0 AND ip="'.$hostip.'"');
+    if ($device->{nagios_status}) { $old_state = $device->{nagios_status}; }
+    } else {
+    $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE id='.$hostid);
+    $login = get_record_sql($hdb,'SELECT * FROM User_list WHERE id='.$auth->{user_id});
+    $device = get_record_sql($hdb,'SELECT * FROM devices WHERE user_id='.$auth->{user_id});
+    if ($auth->{nagios_status}) { $old_state = $auth->{nagios_status}; }
+    }
 
 db_log_debug($hdb,"Get old for $hostname [$hostip] id: $hostid type: $hosttype => state: $old_state");
 if ($hoststate eq "DOWN") { $hoststate=$hoststatetype.$hoststate; }
@@ -117,20 +130,18 @@ if ($hoststate ne $old_state) {
     #Change device state
     db_log_verbose($hdb,"Host changed! $hostname [$hostip] => $hoststate, old: $old_state");
     my $ip_aton=StrToIp($hostip);
-    if ($hosttype=~/device/i) {
-            do_sql($hdb,'UPDATE devices SET nagios_status="'.$hoststate.'" WHERE id='.$hostid);
-            do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE deleted=0 AND ip_int='.$ip_aton);
-            } else {
-            do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE id='.$hostid);
-            }
+    if ($device->{id}) { do_sql($hdb,'UPDATE devices SET nagios_status="'.$hoststate.'" WHERE id='.$device->{id}); }
+    if ($auth->{id}) { do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE id='.$auth->{id}); }
     if ($hoststate=~/UP/i) { nagios_host_svc_enable($hostname,1); }
-    if ($hoststate=~/SOFTDOWN/i) { if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); } }
+    if ($hoststate=~/SOFTDOWN/i) {
+	if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
+	}
     if ($hoststate=~/HARDDOWN/i) {
         if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
         if ($device->{nagios_handler}) {
             db_log_info($hdb,"Event handler $device->{nagios_handler} for $hostname [$hostip] => $hoststate found!");
             if ($device->{nagios_handler}=~/restart-port/i) {
-                    my $run_cmd = "/usr/local/scripts/restart_port_snmp.pl $hostip & ";
+                    my $run_cmd = $HOME_DIR."/restart_port_snmp.pl $hostip & ";
                     db_log_info($hdb,"Nagios eventhandler restart-port started for ip: $hostip");
                     db_log_info($hdb,"Run handler: $run_cmd");
                     system($run_cmd);
