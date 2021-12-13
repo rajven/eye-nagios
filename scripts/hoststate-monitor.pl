@@ -91,7 +91,7 @@ while (my $logline = <hoststate>) {
 next unless defined $logline;
 chomp($logline);
 
-db_log_verbose($hdb,"GET:".$logline);
+log_debug("GET:".$logline);
 
 my ($date,$hoststate,$hoststatetype,$hostname,$hostip,$hostid,$hosttype,$svc_control)= split (/\|/, $logline);
 next if (!$hostid);
@@ -107,6 +107,7 @@ my $old_state = 'HARDDOWN';
 my $device;
 my $auth;
 my $login;
+my $nagios_handler;
 
 if ($hosttype=~/device/i) {
     $device = get_record_sql($hdb,'SELECT * FROM devices WHERE id='.$hostid);
@@ -119,6 +120,8 @@ if ($hosttype=~/device/i) {
     $device = get_record_sql($hdb,'SELECT * FROM devices WHERE user_id='.$auth->{user_id});
     if ($auth->{nagios_status}) { $old_state = $auth->{nagios_status}; }
     }
+
+if ($auth and $auth->{nagios_handler}) { $nagios_handler=$auth->{nagios_handler}; }
 
 db_log_debug($hdb,"Get old for $hostname [$hostip] id: $hostid type: $hosttype => state: $old_state");
 if ($hoststate eq "DOWN") { $hoststate=$hoststatetype.$hoststate; }
@@ -138,9 +141,9 @@ if ($hoststate ne $old_state) {
 	}
     if ($hoststate=~/HARDDOWN/i) {
         if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
-        if ($device->{nagios_handler}) {
-            db_log_info($hdb,"Event handler $device->{nagios_handler} for $hostname [$hostip] => $hoststate found!");
-            if ($device->{nagios_handler}=~/restart-port/i) {
+        if ($nagios_handler) {
+            db_log_info($hdb,"Event handler $nagios_handler for $hostname [$hostip] => $hoststate found!");
+            if ($nagios_handler=~/restart-port/i) {
                     my $run_cmd = $HOME_DIR."/restart_port_snmp.pl $hostip & ";
                     db_log_info($hdb,"Nagios eventhandler restart-port started for ip: $hostip");
                     db_log_info($hdb,"Run handler: $run_cmd");
