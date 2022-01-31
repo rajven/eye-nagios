@@ -20,7 +20,7 @@ use Getopt::Long;
 use Proc::Daemon;
 use Cwd;
 
-my $pf = '/var/run/nagios/hoststate-monitor.pid';
+my $pf = '/var/run/nagios/hmonitor.pid';
 
 my $daemon = Proc::Daemon->new(
         pid_file => $pf,
@@ -94,7 +94,7 @@ chomp($logline);
 log_debug("GET:".$logline);
 
 my ($date,$hoststate,$hoststatetype,$hostname,$hostip,$hostid,$hosttype,$svc_control)= split (/\|/, $logline);
-next if (!$hostid);
+next if (!$hostip);
 
 if (time()-$last_refresh_config>=60) { init_option($hdb); }
 
@@ -109,16 +109,26 @@ my $auth;
 my $login;
 my $nagios_handler;
 
-if ($hosttype=~/device/i) {
-    $device = get_record_sql($hdb,'SELECT * FROM devices WHERE id='.$hostid);
-    $login = get_record_sql($hdb,'SELECT * FROM User_list WHERE id='.$device->{user_id});
-    $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE user_id='.$device->{user_id}.' AND deleted=0 AND ip="'.$hostip.'"');
-    if ($device->{nagios_status}) { $old_state = $device->{nagios_status}; }
-    } else {
-    $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE id='.$hostid);
+if (!$hostid or $hostid !~ /^[0-9]/) {
+    $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE deleted=0 AND ip="'.$hostip.'"');
+    next if (!$auth);
+    $hostid = $auth->{id};
     $login = get_record_sql($hdb,'SELECT * FROM User_list WHERE id='.$auth->{user_id});
     $device = get_record_sql($hdb,'SELECT * FROM devices WHERE user_id='.$auth->{user_id});
     if ($auth->{nagios_status}) { $old_state = $auth->{nagios_status}; }
+    db_log_verbose($hdb,"Manual host: $hostname [$hostip] => $hoststate, old: $old_state");
+    } else {
+    if ($hosttype=~/device/i) {
+        $device = get_record_sql($hdb,'SELECT * FROM devices WHERE id='.$hostid);
+        $login = get_record_sql($hdb,'SELECT * FROM User_list WHERE id='.$device->{user_id});
+        $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE user_id='.$device->{user_id}.' AND deleted=0 AND ip="'.$hostip.'"');
+        if ($device->{nagios_status}) { $old_state = $device->{nagios_status}; }
+        } else {
+        $auth = get_record_sql($hdb,'SELECT * FROM User_auth WHERE id='.$hostid);
+        $login = get_record_sql($hdb,'SELECT * FROM User_list WHERE id='.$auth->{user_id});
+        $device = get_record_sql($hdb,'SELECT * FROM devices WHERE user_id='.$auth->{user_id});
+        if ($auth->{nagios_status}) { $old_state = $auth->{nagios_status}; }
+        }
     }
 
 if ($auth and $auth->{nagios_handler}) { $nagios_handler=$auth->{nagios_handler}; }
@@ -135,12 +145,21 @@ if ($hoststate ne $old_state) {
     my $ip_aton=StrToIp($hostip);
     if ($device->{id}) { do_sql($hdb,'UPDATE devices SET nagios_status="'.$hoststate.'" WHERE id='.$device->{id}); }
     if ($auth->{id}) { do_sql($hdb,'UPDATE User_auth SET nagios_status="'.$hoststate.'" WHERE id='.$auth->{id}); }
-    if ($hoststate=~/UP/i) { nagios_host_svc_enable($hostname,1); }
+    if ($hoststate=~/UP/i) {
+        nagios_host_svc_enable($hostname,1);
+        db_log_debug($hdb,"Enable notifications for host $hostname [$hostip] id: $hostid services");
+        }
     if ($hoststate=~/SOFTDOWN/i) {
-	if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
-	}
+        if ($svc_control) {
+            nagios_host_svc_disable($hostname,$full_action);
+            db_log_debug($hdb,"Disable notifications for host $hostname [$hostip] id: $hostid services");
+            }
+        }
     if ($hoststate=~/HARDDOWN/i) {
-        if ($svc_control) { nagios_host_svc_disable($hostname,$full_action); }
+        if ($svc_control) {
+            nagios_host_svc_disable($hostname,$full_action);
+            db_log_debug($hdb,"Disable notifications for host $hostname [$hostip] id: $hostid services");
+            }
         if ($nagios_handler) {
             db_log_info($hdb,"Event handler $nagios_handler for $hostname [$hostip] => $hoststate found!");
             if ($nagios_handler=~/restart-port/i) {
@@ -165,7 +184,7 @@ if ($@) { log_error("Exception found: $@"); sleep(60); }
 }
 
 sub usage {
-    print "usage: hoststate-monitor.pl (start|stop|status|restart)\n";
+    print "usage: hmonitor.pl (start|stop|status|restart)\n";
     exit(0);
 }
 
@@ -177,3 +196,4 @@ sub restart {
     stop;
     run;
 }
+

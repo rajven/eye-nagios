@@ -142,7 +142,7 @@ if (scalar(@auth_list)>0) {
         next if ($devices{$device_id});
 
 	#skip user device with few ip
-        my $auth_count = get_count_records($dbh,"User_auth","user_id=".$auth->{'user_id'}." AND deleted=0");
+        my $auth_count = get_count_records($dbh,"User_auth","user_id=".$auth->{'user_id'}." AND deleted=0 AND nagios=1");
         next if ($auth_count>1);
 
 	#skip switches and routers

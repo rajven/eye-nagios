@@ -7,12 +7,12 @@ Type=forking
 User=nagios
 Group=nagios
 ExecStartPre=/bin/mkfifo /var/spool/nagios/hoststate.socket
-ExecStart=/usr/local/scripts/hoststate-monitor.pl --start
-ExecStop=/usr/local/scripts/hoststate-monitor.pl --stop
+ExecStart=/usr/local/scripts/hmonitor.pl --start
+ExecStop=/usr/local/scripts/hmonitor.pl --stop
 ExecStopPost=/usr/bin/rm -f /var/spool/nagios/hoststate.socket
 RestartSec=30
 Restart=on-failure
-PIDFile=/var/run/nagios/hoststate-monitor.pid
+PIDFile=/var/run/nagios/hmonitor.pid
 
 [Install]
 WantedBy=multi-user.target
