@@ -3,7 +3,7 @@ package Rstat::nagios;
 #use v5.28;
 use utf8;
 use open ":encoding(utf8)";
-
+no if $] >= 5.018, warnings =>  "experimental::smartmatch";
 use strict;
 use English;
 use FindBin '$Bin';

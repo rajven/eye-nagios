@@ -1,18 +1,18 @@
 [Unit]
 Description=Analyze nagios hoststate
-Before=nagios.service
+Before=nagios4.service
 
 [Service]
 Type=forking
 User=nagios
 Group=nagios
-ExecStartPre=/bin/mkfifo /var/spool/nagios/hoststate.socket
-ExecStart=/usr/local/scripts/hmonitor.pl --start
-ExecStop=/usr/local/scripts/hmonitor.pl --stop
-ExecStopPost=/usr/bin/rm -f /var/spool/nagios/hoststate.socket
+ExecStartPre=/bin/mkfifo /var/spool/nagios4/hoststate.socket
+ExecStart=/opt/Eye/scripts/hmonitor.pl --start
+ExecStop=/opt/Eye/scripts/hmonitor.pl --stop
+ExecStopPost=/usr/bin/rm -f /var/spool/nagios4/hoststate.socket
 RestartSec=30
 Restart=on-failure
-PIDFile=/var/run/nagios/hmonitor.pid
+PIDFile=/var/run/nagios4/hmonitor.pid
 
 [Install]
 WantedBy=multi-user.target

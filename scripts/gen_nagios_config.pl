@@ -19,6 +19,15 @@ use Rstat::main;
 use Rstat::nagios;
 use Rstat::mysql;
 use Fcntl qw(:flock);
+
+#use feature qw( switch );
+#no warnings qw( experimental::smartmatch );
+#no if $] >= 5.018, warnings => qw( experimental::smartmatch );
+#no warnings 'experimental';
+#$SIG{__WARN__} = sub {
+#   warn($_[0]) if $_[0] !~ /is experimental at/;
+#};
+
 open(SELF,"<",$0) or die "Cannot open $0 - $!";
 flock(SELF, LOCK_EX|LOCK_NB) or exit 1;
 
@@ -26,6 +35,8 @@ my %devices;
 my %auths;
 
 my %dependency;
+
+my $nagios_devices = "/etc/snmp/devices.cfg";
 
 my @OU_list = get_records_sql($dbh,"SELECT * FROM OU");
 my %ou;
@@ -142,7 +153,7 @@ if (scalar(@auth_list)>0) {
         next if ($devices{$device_id});
 
 	#skip user device with few ip
-        my $auth_count = get_count_records($dbh,"User_auth","user_id=".$auth->{'user_id'}." AND deleted=0 AND nagios=1");
+        my $auth_count = get_count_records($dbh,"User_auth","user_id=".$auth->{'user_id'}." AND deleted=0");
         next if ($auth_count>1);
 
 	#skip switches and routers
@@ -219,11 +230,14 @@ foreach my $dir (@cfg_dirs) {
 
 ##################################### Switches config ################################################
 
+write_to_file($nagios_devices,"#lisf of device for nagios",0);
+
 foreach my $device_id (keys %devices) {
 my $device = $devices{$device_id};
 next if (!$device->{ip});
 if ($device->{parent_name}) { push(@{$dependency{$device->{parent_name}}},$device->{name}); }
 print_nagios_cfg($device);
+write_to_file($nagios_devices,'$devices{"'.$device->{'ip'}.'"}{"hostname"}="'.$device->{'name'}.'";',1);
 }
 
 ####################### Dependency ###########################

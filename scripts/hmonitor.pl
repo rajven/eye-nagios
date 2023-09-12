@@ -20,7 +20,7 @@ use Getopt::Long;
 use Proc::Daemon;
 use Cwd;
 
-my $pf = '/var/run/nagios/hmonitor.pid';
+my $pf = '/var/run/nagios4/hmonitor.pid';
 
 my $daemon = Proc::Daemon->new(
         pid_file => $pf,
