@@ -1,4 +1,4 @@
-package Rstat::config;
+package eyelib::config;
 
 #
 # Copyright (C) Roman Dmitiriev, rnd@rajven.ru

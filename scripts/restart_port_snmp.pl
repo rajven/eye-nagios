@@ -10,11 +10,11 @@ use strict;
 use Time::Local;
 use FileHandle;
 use Data::Dumper;
-use Rstat::config;
-use Rstat::main;
-use Rstat::net_utils;
-use Rstat::mysql;
-use Rstat::snmp;
+use eyelib::config;
+use eyelib::main;
+use eyelib::net_utils;
+use eyelib::mysql;
+use eyelib::snmp;
 use Net::SNMP qw(:snmp);
 
 my $pethPsePortAdminEnable ='.1.3.6.1.2.1.105.1.1.1.3.1.';

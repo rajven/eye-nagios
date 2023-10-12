@@ -1,4 +1,4 @@
-package Rstat::nagios;
+package eyelib::nagios;
 
 #use v5.28;
 use utf8;
@@ -10,9 +10,9 @@ use FindBin '$Bin';
 use lib "$Bin";
 use base 'Exporter';
 use vars qw(@EXPORT @ISA);
-use Rstat::config;
-use Rstat::main;
-use Rstat::mysql;
+use eyelib::config;
+use eyelib::main;
+use eyelib::mysql;
 use Time::Local;
 use Data::Dumper;
 

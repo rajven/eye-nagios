@@ -14,10 +14,10 @@ use Fcntl;
 use Tie::File;
 use Data::Dumper;
 use Net::Ping;
-use Rstat::config;
-use Rstat::main;
-use Rstat::nagios;
-use Rstat::mysql;
+use eyelib::config;
+use eyelib::main;
+use eyelib::nagios;
+use eyelib::mysql;
 use Fcntl qw(:flock);
 
 #use feature qw( switch );
