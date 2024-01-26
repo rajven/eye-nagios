@@ -21,7 +21,7 @@ use Proc::Daemon;
 use Cwd;
 use File::Tail;
 
-my $pf = '/run/hmonitor.pid';
+my $pf = '/run/hmonitor/hmonitor.pid';
 
 my $daemon = Proc::Daemon->new(
         pid_file => $pf,
