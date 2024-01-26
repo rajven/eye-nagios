@@ -20,14 +20,6 @@ use eyelib::nagios;
 use eyelib::mysql;
 use Fcntl qw(:flock);
 
-#use feature qw( switch );
-#no warnings qw( experimental::smartmatch );
-#no if $] >= 5.018, warnings => qw( experimental::smartmatch );
-#no warnings 'experimental';
-#$SIG{__WARN__} = sub {
-#   warn($_[0]) if $_[0] !~ /is experimental at/;
-#};
-
 open(SELF,"<",$0) or die "Cannot open $0 - $!";
 flock(SELF, LOCK_EX|LOCK_NB) or exit 1;
 

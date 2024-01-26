@@ -3,7 +3,6 @@ package eyelib::nagios;
 #use v5.28;
 use utf8;
 use open ":encoding(utf8)";
-no if $] >= 5.018, warnings =>  "experimental::smartmatch";
 use strict;
 use English;
 use FindBin '$Bin';
@@ -188,7 +187,7 @@ if ($custom_cfg->{template}) {
     }
 
 #switch | router
-if ($device->{type} ~~ [1,2]) {
+if (in_array([0,1,2],$device->{type})) {
     open(FH, "> $cfg_file");
     my $device_template = 'switches';
     if ($device->{type} eq 2) {  $device_template='routers'; }

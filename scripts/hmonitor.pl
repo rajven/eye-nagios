@@ -19,8 +19,9 @@ use Date::Parse;
 use Getopt::Long;
 use Proc::Daemon;
 use Cwd;
+use File::Tail;
 
-my $pf = '/var/run/nagios4/hmonitor.pid';
+my $pf = '/run/hmonitor.pid';
 
 my $daemon = Proc::Daemon->new(
         pid_file => $pf,
@@ -85,9 +86,14 @@ eval {
 my $hdb = DBI->connect("dbi:mysql:database=$DBNAME;host=$DBHOST","$DBUSER","$DBPASS");
 if ( !defined $hdb ) { die "Cannot connect to mySQL server: $DBI::errstr\n"; }
 
-open(hoststate,$config_ref{nagios_event_socket}) || die("Error open fifo socket $config_ref{nagios_event_socket}: $!");
+#parse log
+my $nagios_log=File::Tail->new(name=>$config_ref{nagios_event_socket},maxinterval=>5,interval=>1,ignore_nonexistant=>1) || die "$config_ref{nagios_event_socket} not found!";
 
-while (my $logline = <hoststate>) {
+#truncate current log file
+truncate $config_ref{nagios_event_socket}, 0;
+
+while (my $logline=$nagios_log->read) {
+
 next unless defined $logline;
 chomp($logline);
 
@@ -174,7 +180,6 @@ if ($hoststate ne $old_state) {
         }
     }
 }
-close(hoststate);
 };
 if ($@) { log_error("Exception found: $@"); sleep(60); }
 }
@@ -196,4 +201,3 @@ sub restart {
     stop;
     run;
 }
-
